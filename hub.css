@@ -62,3 +62,46 @@ body.hub {
 .sea .key { position: absolute; right: 18%; bottom: 12px; font-size: 2rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
 
 .hub-foot { text-align: center; margin-top: 26px; opacity: 0.7; font-size: 0.85rem; }
+
+.hub-tip { margin: 10px auto 0; max-width: 560px; padding: 8px 14px; border-radius: 12px; background: rgba(255,255,255,.12); font-size: 0.92rem; line-height: 1.55; }
+
+/* 흑백 뒤집기 그림 */
+.flip .art { background: radial-gradient(circle at 50% 40%, #2a8a5a, #1f6b46); }
+.flip .d { position: absolute; top: 44px; width: 54px; height: 54px; border-radius: 50%; box-shadow: inset 0 -6px 0 rgba(0,0,0,.25), 0 8px 14px rgba(0,0,0,.4); }
+.flip .d1 { left: calc(50% - 116px); background: #1a1a1f; }
+.flip .d2 { left: calc(50% - 56px); background: #f4f1e8; top: 30px; }
+.flip .d3 { left: calc(50% + 4px); background: #1a1a1f; top: 52px; }
+.flip .d4 { left: calc(50% + 64px); background: #f4f1e8; animation: flipd 2.4s ease-in-out infinite; }
+@keyframes flipd { 0%, 40% { background: #f4f1e8; transform: scaleX(1); } 50% { transform: scaleX(0.05); } 60%, 100% { background: #1a1a1f; transform: scaleX(1); } }
+
+/* 컬러 러시 그림 */
+.rush .art { background: linear-gradient(135deg, #263247, #1a2233); }
+.rush .k { position: absolute; top: 26px; width: 60px; height: 88px; border-radius: 10px; display: grid; place-items: center; font-family: var(--display); font-size: 2.2rem; color: #fff; border: 4px solid #fff; box-shadow: 0 10px 18px rgba(0,0,0,.45); }
+.rush .k1 { left: calc(50% - 110px); background: #ef5d7a; transform: rotate(-12deg); }
+.rush .k2 { left: calc(50% - 30px); background: #3fb5a3; top: 16px; }
+.rush .k3 { left: calc(50% + 50px); background: #f2b13b; transform: rotate(11deg); }
+
+/* 비밀번호 해독반 그림 */
+.code .art { background: linear-gradient(#2c2442, #18132a); }
+.code .b { position: absolute; top: 32px; width: 46px; height: 74px; border-radius: 8px; display: grid; place-items: center; font-family: var(--display); font-size: 2rem; box-shadow: 0 8px 0 rgba(0,0,0,.35); }
+.code .b1 { left: calc(50% - 104px); background: #1b1b22; color: #8f86b8; }
+.code .b2 { left: calc(50% - 50px); background: #f6f3ea; color: #1b1b22; top: 22px; }
+.code .b3 { left: calc(50% + 4px); background: #1b1b22; color: #8f86b8; }
+.code .b4 { left: calc(50% + 58px); background: #f6f3ea; color: #b9b2a0; }
+
+/* 숫자 블록 정원 그림 */
+.garden .art { background: linear-gradient(#6fbf73, #3f8f4a); }
+.garden .g { position: absolute; top: 34px; width: 50px; height: 70px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(#fffef9, #f0ead9); font-family: var(--display); font-size: 2rem; box-shadow: 0 6px 0 #d9cfb6, 0 10px 16px rgba(0,0,0,.3); }
+.garden .g1 { left: calc(50% - 112px); color: #d9486a; }
+.garden .g2 { left: calc(50% - 58px); color: #d9486a; }
+.garden .g3 { left: calc(50% - 4px); color: #d9486a; }
+.garden .g4 { left: calc(50% + 62px); color: #2563eb; transform: rotate(8deg); top: 26px; }
+
+/* 급식 다섯 그림 */
+.lunch .art { background: linear-gradient(#ffd27a, #f5a742); }
+.lunch .f { position: absolute; top: 34px; width: 88px; height: 72px; border-radius: 12px; background: #fff; display: grid; place-items: center; font-size: 1.4rem; box-shadow: 0 8px 14px rgba(0,0,0,.25); }
+.lunch .f1 { left: calc(50% - 120px); transform: rotate(-8deg); }
+.lunch .f2 { left: calc(50% - 20px); transform: rotate(5deg); }
+.lunch .bell { position: absolute; right: 12%; bottom: 10px; font-size: 2.6rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); animation: ring 1.8s ease-in-out infinite; }
+@keyframes ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-18deg); } 85% { transform: rotate(16deg); } 92% { transform: rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .flip .d4, .lunch .bell { animation: none; } }
