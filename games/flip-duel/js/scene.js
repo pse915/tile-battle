@@ -99,14 +99,15 @@ export class FlipStage {
   build() {
     const g = this.s.group;
     const tex = canvasTexture('fd-board', (ctx, w) => drawBoard(ctx, w), 1024, 1024);
-    const frame = new THREE.MeshStandardMaterial({ color: 0x2b1a0e, roughness: 0.5 });
+    const frame = new THREE.MeshPhysicalMaterial({ color: 0x3a2412, roughness: 0.45, clearcoat: 0.6, clearcoatRoughness: 0.3 });
     const board = new THREE.Mesh(new THREE.BoxGeometry(BOARD + 0.6, 0.24, BOARD + 0.6), [frame, frame, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }), frame, frame, frame]);
     board.receiveShadow = true;
     board.castShadow = true;
     g.add(board);
     // 돌 재질
-    this.matBlack = new THREE.MeshStandardMaterial({ color: 0x1a1a1f, roughness: 0.35, metalness: 0.1 });
-    this.matWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.4 });
+    // 돌: 코팅된 플라스틱 느낌 (환경 반사 + 윤기)
+    this.matBlack = new THREE.MeshPhysicalMaterial({ color: 0x15151a, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.12 });
+    this.matWhite = new THREE.MeshPhysicalMaterial({ color: 0xf2eee3, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.15 });
     this.discGeo = new THREE.CylinderGeometry(DISC_R, DISC_R, DISC_H / 2, 40);
     // 칸 고르기용 투명 판
     const pickMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });

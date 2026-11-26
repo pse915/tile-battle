@@ -2,6 +2,11 @@
 // 게임은 TableStage를 만들고 stage.group 아래에 자기 물건을 올리면 됨.
 import * as THREE from 'three';
 import { updateTweens, tween, ease, lerp } from './anim.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 export { THREE };
 
@@ -114,11 +119,26 @@ export class TableStage {
     r.shadowMap.enabled = high;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.1;
+    r.toneMappingExposure = this.o.exposure ?? 0.8;
     r.domElement.setAttribute('aria-label', '게임 테이블');
     this.container.prepend(r.domElement);
     this.renderer = r;
     this.sun.castShadow = high;
+    // 환경 조명(실내 반사광): 한 번 구워 두고 모든 재질이 은은하게 반사 — 낮음에서도 비용 거의 없음
+    const pmrem = new THREE.PMREMGenerator(r);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    this.hemi.intensity = 0.25;
+    this.sun.intensity = 1.1;
+    // 후처리(높음만): 밝은 곳이 살짝 번지는 빛 + 색 보정 출력
+    this.composer = null;
+    if (high) {
+      this.composer = new EffectComposer(r);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), this.o.bloom ?? 0.18, 0.4, 0.95);
+      this.composer.addPass(this.bloom);
+      this.composer.addPass(new OutputPass());
+    }
     anisotropy = high ? Math.min(8, r.capabilities.getMaxAnisotropy()) : 2;
     this.resize();
     r.setAnimationLoop(() => this.loop());
@@ -129,6 +149,7 @@ export class TableStage {
     const w = this.container.clientWidth || innerWidth;
     const h = this.container.clientHeight || innerHeight;
     this.renderer.setSize(w, h);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     const a = this.camera.aspect;
@@ -153,10 +174,13 @@ export class TableStage {
   buildWorld() {
     const s = this.scene;
     const o = this.o;
-    s.add(new THREE.HemisphereLight(0xfff4e0, 0x302820, 0.9));
+    this.hemi = new THREE.HemisphereLight(0xfff4e0, 0x302820, 0.9);
+    s.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xfff1d6, 1.4);
     sun.position.set(-5, 14, 6);
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 4;
+    sun.shadow.normalBias = 0.02;
     Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 2, far: 40 });
     sun.shadow.bias = -0.0005;
     s.add(sun);
@@ -269,7 +293,8 @@ export class TableStage {
       }
       cam.lookAt(this.camTarget);
     }
-    this.renderer.render(this.scene, cam);
+    if (this.composer) this.composer.render(dt);
+    else this.renderer.render(this.scene, cam);
   }
 
   /** 테스트용: 화면이 숨겨져 rAF가 멈춰도 강제로 그림 */
