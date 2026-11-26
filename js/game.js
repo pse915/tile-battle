@@ -314,18 +314,10 @@ export class Game {
     this.players.forEach((p, k) => (p.chips += delta[k]));
     this.refreshBoard();
 
-    const rows = this.players
-      .map((p, k) => {
-        const s = scores[k];
-        const d = delta[k];
-        return `<tr><td>${p.emoji} ${ui.esc(p.name)}${k === winner ? ' 🏆' : ''}</td><td>${s.left}</td><td>${s.twos ? `${s.twos}장 (×${2 ** s.twos})` : '-'}</td><td>${s.score}</td><td class="${d > 0 ? 'plus' : d < 0 ? 'minus' : ''}">${d > 0 ? '+' : ''}${d}</td><td><b>${p.chips}</b></td></tr>`;
-      })
-      .join('');
     const gameOver = this.round >= this.cfg.rounds || this.players.some((p) => p.chips <= 0);
     const go = await ui.modal({
       title: `라운드 ${this.round} 결과`,
-      html: `<table class="result-table"><thead><tr><th>이름</th><th>남은 타일</th><th>2</th><th>점수</th><th>칩 변화</th><th>칩</th></tr></thead><tbody>${rows}</tbody></table>
-        <p class="note">점수 = 남은 장수 × 2<sup>(남은 2의 수)</sup>. 모든 두 사람이 점수 차이만큼 칩을 주고받아요.</p>`,
+      html: ui.resultTableHtml(this.players, scores, delta, winner),
       buttons: [{ label: gameOver ? '최종 순위 보기' : '다음 라운드', value: true, primary: true }],
     });
     if (this.aborted || !go) return;
@@ -335,16 +327,12 @@ export class Game {
 
   async finish() {
     this.stage.setHand([]);
-    const ranked = this.players.map((p, k) => ({ ...p, k })).sort((a, b) => b.chips - a.chips);
-    const humanTop = !ranked[0].ai;
-    if (humanTop) audio.win();
+    const top = this.players.reduce((a, b) => (b.chips > a.chips ? b : a));
+    if (!top.ai) audio.win();
     ui.confetti(4);
-    const step = (p, cls, place) =>
-      p ? `<div class="step ${cls}"><div class="who"><span class="avatar">${p.emoji}</span>${ui.esc(p.name)}<br><small>🪙 ${p.chips}</small></div><div class="block">${place}</div></div>` : '';
-    const rest = ranked.slice(3).map((p, idx) => `<li>${idx + 4}등 ${p.emoji} ${ui.esc(p.name)} · 🪙 ${p.chips}</li>`).join('');
     const choice = await ui.modal({
       title: '최종 순위',
-      html: `<div class="podium">${step(ranked[1], 's2', 2)}${step(ranked[0], 's1', 1)}${step(ranked[2], 's3', 3)}</div>${rest ? `<ul class="rest-list">${rest}</ul>` : ''}`,
+      html: ui.podiumHtml(this.players),
       buttons: [
         { label: '메인으로', value: 'menu' },
         { label: '다시 하기', value: 'again', primary: true },

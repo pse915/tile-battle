@@ -4,6 +4,8 @@ import { ensureFonts } from './tiles.js';
 import { audio } from './audio.js';
 import { Game } from './game.js';
 import { Tutorial } from './tutorial.js';
+import { Online } from './online.js';
+import { onlineReady } from './net.js';
 import { runSelfTests } from './rules.js';
 import { load, save, loadSettings, saveSettings } from './storage.js';
 import * as ui from './ui.js';
@@ -20,7 +22,8 @@ const HUMAN_EMOJI = ['🙂', '😎', '🤓', '😺', '🐥'];
 let settings = loadSettings();
 let stage;
 let game;
-let controller = null; // 지금 입력을 받는 쪽: game 또는 tutorial
+let online;
+let controller = null; // 지금 입력을 받는 쪽: game, tutorial, online
 let setupMode = 'solo';
 
 async function boot() {
@@ -38,10 +41,18 @@ async function boot() {
   window.addEventListener('resize', updateBottomInset);
 
   game = new Game(stage, () => goMenu());
-  window.__tileBattle = { stage, game }; // 디버깅용
+  online = new Online(stage, {
+    onEnterGame: () => {
+      controller = online;
+      updateBottomInset();
+    },
+    onExit: () => goMenu(),
+  });
+  window.__tileBattle = { stage, game, online }; // 디버깅용
   stage.onTileClick = (t) => controller?.onTileClick(t);
 
   bindUi();
+  bindOnline();
   ui.bindClickSounds();
   $('#rules-body').innerHTML = ui.rulesHtml();
   $('#help-body').innerHTML = ui.helpHtml();
@@ -65,6 +76,7 @@ function updateBottomInset() {
 // ---------- 화면 전환 ----------
 function goMenu() {
   game.stop();
+  online.leave();
   controller = null;
   stage.setTitleMode(true);
   ui.closeModal();
@@ -74,6 +86,12 @@ function goMenu() {
 async function enterMenuFromTitle() {
   audio.unlock();
   audio.startBgm();
+  // 초대 링크(?room=1234)로 들어오면 바로 참여 화면
+  const room = new URLSearchParams(location.search).get('room');
+  if (room && /^[0-9]{4}$/.test(room)) {
+    openOnline(room);
+    return;
+  }
   ui.showScreen('screen-menu');
   if (!load('tutorialDone', false)) {
     const go = await ui.modal({
@@ -101,6 +119,83 @@ function startTutorial() {
   ui.showHud(true);
   updateBottomInset();
   tut.start();
+}
+
+// ---------- 온라인 ----------
+function openOnline(code = '') {
+  const ready = onlineReady();
+  $('#online-setup-note').hidden = ready;
+  $('#btn-join-room').classList.toggle('is-off', !ready);
+  $('#btn-create-room').classList.toggle('is-off', !ready);
+  $('#online-nick').value = load('nick', '');
+  $('#room-code').value = code;
+  ui.showScreen('screen-online');
+  if (!$('#online-nick').value) $('#online-nick').focus();
+}
+
+function onlineNick() {
+  const nick = ($('#online-nick').value || '').trim();
+  if (!nick) {
+    ui.toast('닉네임을 먼저 적어 주세요.');
+    $('#online-nick').focus();
+    return null;
+  }
+  save('nick', nick);
+  return nick;
+}
+
+async function onlineAction(btn, fn) {
+  if (!onlineReady()) return ui.toast('온라인 서버가 아직 설정되지 않았어요.');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const label = btn.innerHTML;
+  btn.textContent = '연결 중…';
+  try {
+    await fn();
+  } catch (err) {
+    audio.error();
+    ui.toast(err.message, 2600);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = label;
+  }
+}
+
+async function copyText(text, done) {
+  try {
+    await navigator.clipboard.writeText(text);
+    ui.toast(done);
+  } catch {
+    ui.toast(text, 4000); // 복사가 막힌 환경이면 화면에 보여 줌
+  }
+}
+
+function bindOnline() {
+  $('#btn-create-room').addEventListener('click', (e) => {
+    const nick = onlineNick();
+    if (nick) onlineAction(e.currentTarget, () => online.create(nick));
+  });
+  const join = (btn) => {
+    const nick = onlineNick();
+    const code = ($('#room-code').value || '').trim();
+    if (!nick) return;
+    if (!/^[0-9]{4}$/.test(code)) return ui.toast('방 코드 숫자 4자리를 입력해 주세요.');
+    onlineAction(btn, () => online.join(code, nick));
+  };
+  $('#btn-join-room').addEventListener('click', (e) => join(e.currentTarget));
+  $('#room-code').addEventListener('keydown', (e) => e.key === 'Enter' && join($('#btn-join-room')));
+  $('#room-code').addEventListener('input', (e) => (e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4)));
+
+  $('#btn-lobby-leave').addEventListener('click', () => goMenu());
+  $('#btn-lobby-start').addEventListener('click', () => online.startGame());
+  $('#btn-copy-code').addEventListener('click', () => copyText(online.code, `방 코드 ${online.code}를 복사했어요`));
+  $('#btn-copy-link').addEventListener('click', () => copyText(online.shareLink(), '초대 링크를 복사했어요'));
+  document.querySelectorAll('[data-bot]').forEach((b) => b.addEventListener('click', () => online.send('addBot', { difficulty: b.dataset.bot })));
+  $('#lobby-players').addEventListener('click', (e) => {
+    const id = e.target.closest('[data-remove]')?.dataset.remove;
+    if (id) online.send('removeBot', { botId: id });
+  });
+  document.querySelectorAll('input[name="lrounds"]').forEach((r) => r.addEventListener('change', () => online.send('config', { rounds: Number(r.value) })));
 }
 
 function openSetup(mode) {
@@ -167,10 +262,14 @@ async function startGame() {
 }
 
 async function pauseMenu() {
-  const isTut = controller && controller !== game;
+  const isTut = controller instanceof Tutorial;
   const choice = await ui.modal({
     title: '잠깐 멈춤',
-    html: isTut ? '<p>튜토리얼을 그만둘까요?</p>' : '<p>게임을 계속할까요? 나가면 이번 게임 기록은 사라져요.</p>',
+    html: isTut
+      ? '<p>튜토리얼을 그만둘까요?</p>'
+      : controller === online
+        ? '<p>방에서 나갈까요? 내 자리는 봇이 이어서 둬요.</p>'
+        : '<p>게임을 계속할까요? 나가면 이번 게임 기록은 사라져요.</p>',
     buttons: [
       { label: '메인으로 나가기', value: 'exit' },
       { label: '계속하기', value: 'resume', primary: true },
@@ -213,6 +312,7 @@ function bindUi() {
     b.addEventListener('click', () => {
       const go = b.dataset.go;
       if (go === 'solo' || go === 'hot') openSetup(go);
+      else if (go === 'online') openOnline();
       else if (go === 'tutorial') startTutorial();
       else if (go === 'settings') {
         syncSettingsForm();

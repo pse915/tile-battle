@@ -85,9 +85,30 @@ export function setLabelVisibility(viewSeat) {
   labelEls.forEach((el, i) => (el.hidden = i === viewSeat));
 }
 
-export function updateLabel(i, { count, chips }) {
+export function updateLabel(i, { count, chips, away = false }) {
   const el = labelEls[i];
-  if (el) el.querySelector('.meta').textContent = `🀫 ${count}장 · 🪙 ${chips}`;
+  if (el) el.querySelector('.meta').textContent = `🀫 ${count}장 · 🪙 ${chips}${away ? ' · 💤' : ''}`;
+}
+
+// ---------- 결과표 / 시상대 (혼자 하기와 온라인 공용) ----------
+export function resultTableHtml(players, scores, delta, winner) {
+  const rows = players
+    .map((p, k) => {
+      const s = scores[k];
+      const d = delta[k];
+      return `<tr><td>${p.emoji} ${esc(p.name)}${k === winner ? ' 🏆' : ''}</td><td>${s.left}</td><td>${s.twos ? `${s.twos}장 (×${2 ** s.twos})` : '-'}</td><td>${s.score}</td><td class="${d > 0 ? 'plus' : d < 0 ? 'minus' : ''}">${d > 0 ? '+' : ''}${d}</td><td><b>${p.chips}</b></td></tr>`;
+    })
+    .join('');
+  return `<table class="result-table"><thead><tr><th>이름</th><th>남은 타일</th><th>2</th><th>점수</th><th>칩 변화</th><th>칩</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">점수 = 남은 장수 × 2<sup>(남은 2의 수)</sup>. 모든 두 사람이 점수 차이만큼 칩을 주고받아요.</p>`;
+}
+
+export function podiumHtml(players) {
+  const ranked = players.slice().sort((a, b) => b.chips - a.chips);
+  const step = (p, cls, place) =>
+    p ? `<div class="step ${cls}"><div class="who"><span class="avatar">${p.emoji}</span>${esc(p.name)}<br><small>🪙 ${p.chips}</small></div><div class="block">${place}</div></div>` : '';
+  const rest = ranked.slice(3).map((p, idx) => `<li>${idx + 4}등 ${p.emoji} ${esc(p.name)} · 🪙 ${p.chips}</li>`).join('');
+  return `<div class="podium">${step(ranked[1], 's2', 2)}${step(ranked[0], 's1', 1)}${step(ranked[2], 's3', 3)}</div>${rest ? `<ul class="rest-list">${rest}</ul>` : ''}`;
 }
 
 export function setTurnLabel(i) {

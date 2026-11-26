@@ -45,6 +45,7 @@
       <header class="sheet-head"><span class="mini-stamp">끝!</span> 타일 배틀</header>
       <div class="menu-list">
         <button class="btn primary big" data-go="solo">🤖 혼자 하기 <small>AI와 대결</small></button>
+        <button class="btn big" data-go="online">🌐 온라인 방 <small>코드로 친구와 각자 폰에서</small></button>
         <button class="btn big" data-go="hot">👥 같이 하기 <small>한 기기로 돌려 가며</small></button>
         <button class="btn" data-go="tutorial">🎓 튜토리얼 다시 보기</button>
         <div class="menu-row">
@@ -96,6 +97,68 @@
         <button type="button" class="btn primary" id="btn-start-game">게임 시작</button>
       </div>
     </form>
+  </section>
+
+  <!-- 온라인: 방 만들기 / 참여 -->
+  <section id="screen-online" class="screen" aria-label="온라인 방">
+    <form class="sheet" id="online-form" onsubmit="return false">
+      <header class="sheet-head">온라인 방</header>
+      <p class="note setup-note" id="online-setup-note" hidden>온라인 서버가 아직 설정되지 않았어요. 선생님께 README의 ‘온라인 대기방 설정’을 부탁하세요.</p>
+      <div class="field">
+        <label for="online-nick">닉네임</label>
+        <input id="online-nick" maxlength="8" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="room-code">친구 방에 들어가기</label>
+        <div class="join-row">
+          <input id="room-code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="코드 4자리" autocomplete="off" />
+          <button type="button" class="btn primary" id="btn-join-room">참여하기</button>
+        </div>
+      </div>
+      <div class="or-line"><span>또는</span></div>
+      <button type="button" class="btn big" id="btn-create-room">🏠 새 방 만들기 <small>코드를 친구에게 알려 주세요</small></button>
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-go="menu">뒤로</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 온라인: 대기방 -->
+  <section id="screen-lobby" class="screen" aria-label="대기방">
+    <div class="sheet lobby-sheet">
+      <header class="sheet-head">대기방 <span class="lobby-count" id="lobby-count"></span></header>
+      <p class="lobby-label">방 코드</p>
+      <div class="room-code" id="lobby-code" aria-live="polite"></div>
+      <div class="share-row">
+        <button class="btn small" id="btn-copy-code">코드 복사</button>
+        <button class="btn small" id="btn-copy-link">초대 링크 복사</button>
+      </div>
+      <ul class="lobby-players" id="lobby-players"></ul>
+      <div id="lobby-host">
+        <div class="field">
+          <label>봇 넣기</label>
+          <div class="bot-row">
+            <button class="btn small" data-bot="easy">🤖 쉬움</button>
+            <button class="btn small" data-bot="normal">🤖 보통</button>
+            <button class="btn small" data-bot="hard">🤖 어려움</button>
+          </div>
+        </div>
+        <fieldset class="field">
+          <legend>라운드 수</legend>
+          <div class="seg">
+            <label><input type="radio" name="lrounds" value="3" /><span>3판</span></label>
+            <label><input type="radio" name="lrounds" value="5" checked /><span>5판</span></label>
+            <label><input type="radio" name="lrounds" value="7" /><span>7판</span></label>
+          </div>
+        </fieldset>
+      </div>
+      <p id="lobby-guest" class="note">라운드 수: <b id="lobby-guest-rounds"></b></p>
+      <p class="lobby-hint" id="lobby-hint"></p>
+      <div class="sheet-actions">
+        <button class="btn" id="btn-lobby-leave">나가기</button>
+        <button class="btn primary" id="btn-lobby-start">게임 시작</button>
+      </div>
+    </div>
   </section>
 
   <!-- 설정 -->
