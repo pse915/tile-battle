@@ -53,6 +53,8 @@ GitHub Pages에는 서버가 없어서, 구글 앱스크립트를 무료 서버�
 6. 화면에 나온 **웹 앱 URL**(`https://script.google.com/macros/s/…/exec`)을 복사합니다.
 7. 이 저장소의 `js/config.js`를 열어 `ONLINE_URL = '여기에 붙여넣기'`로 바꾸고 커밋·푸시합니다. GitHub 웹에서 연필 아이콘으로 바로 고쳐도 됩니다.
 
+> 시트 메뉴 대신 [script.new](https://script.new)에서 독립 스크립트로 만들었다면, `Code.gs` 위쪽의 `const SHEET_ID = '';`에 시트 ID(시트 주소의 `/d/`와 `/edit` 사이)를 넣어 주세요.
+
 설정이 끝나면 시트에 **`방 기록`** 탭이 생기고, 방을 만들거나 게임이 끝날 때마다 한 줄씩 남습니다(시간, 방 코드, 닉네임, 결과).
 
 **알아두면 좋은 점**
