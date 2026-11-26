@@ -10,6 +10,7 @@
 //   name(code) → 로그에 쓸 이름 ('빨강 7')
 //   back(code)? → 남들에게 보이는 뒷면 정보 ('b' 검정 타일 등). 기본 ''
 //   sort(a, b)? → 패 자동 정렬 비교 함수 (코드끼리)
+//   keepOrder? → 새 카드만 정렬 자리에 끼우고 기존 순서(손으로 옮긴 조커 등)는 유지
 //   secret(n)? → 한 사람에 1장씩 비밀로 받는 카드 (역할 카드)
 //   blind? → 내 패도 못 봄 (뒤집어 쌓아 둔 더미)
 //   hideOrder? → 내 패 구성은 보이지만 자리는 모름 (남이 자리로 고름)
@@ -37,6 +38,19 @@ function offlineModule(g) {
   const backOf = (f) => (cfg.back ? cfg.back(f) : '');
   const sortHand = (h) => {
     if (cfg.sort && !cfg.hideOrder) h.sort((a, b) => cfg.sort(a.f, b.f));
+  };
+  // keepOrder: 이미 손으로 옮겨 둔 순서(조커 자리 등)는 그대로 두고, 새 카드만 정렬된 자리에 끼워 넣음
+  const addToHand = (ot, seat, cards) => {
+    const h = ot.hands[seat];
+    if (cfg.keepOrder && cfg.sort && !cfg.hideOrder) {
+      cards.forEach((c) => {
+        const i = h.findIndex((x) => cfg.sort(c.f, x.f) < 0);
+        h.splice(i < 0 ? h.length : i, 0, c);
+      });
+    } else {
+      ot.hands[seat] = h.concat(cards);
+      sortHand(ot.hands[seat]);
+    }
   };
   const zoneDef = (zid) => zoneDefs.find((z) => z.id === String(zid).split(':')[0]);
   const zoneTitle = (room, zid) => {
@@ -176,8 +190,7 @@ function offlineModule(g) {
         case 'ot_take': {
           const cards = takeFrom(ot, seat, req.ids || [], false, true);
           cards.forEach((c) => (c.up = false));
-          ot.hands[seat] = ot.hands[seat].concat(cards);
-          sortHand(ot.hands[seat]);
+          addToHand(ot, seat, cards);
           log(room, seat, listNames(cards) + ' 가져감');
           break;
         }
@@ -191,8 +204,7 @@ function offlineModule(g) {
             got.push(ot.draw.splice(i, 1)[0]);
           }
           if (!got.length) fail('뽑을 카드가 없어요.');
-          ot.hands[seat] = ot.hands[seat].concat(got);
-          sortHand(ot.hands[seat]);
+          addToHand(ot, seat, got);
           log(room, seat, '카드 ' + got.length + '장 뽑음' + (back ? ' (' + (cfg.backName ? cfg.backName(back) : back) + ')' : ''));
           break;
         }
@@ -225,8 +237,7 @@ function offlineModule(g) {
           }
           if (!card) fail('줄 카드가 없어요.');
           card.up = false;
-          ot.hands[to].push(card);
-          sortHand(ot.hands[to]);
+          addToHand(ot, to, [card]);
           log(room, seat, room.players[to].name + '에게 카드 1장 줌');
           break;
         }
@@ -263,8 +274,7 @@ function offlineModule(g) {
           });
           if (!got.length) fail('가져갈 카드가 없어요.');
           got.forEach((c) => (c.up = false));
-          ot.hands[to] = ot.hands[to].concat(got);
-          sortHand(ot.hands[to]);
+          addToHand(ot, to, got);
           log(room, seat, '테이블 카드 ' + got.length + '장 → ' + room.players[to].name);
           break;
         }
