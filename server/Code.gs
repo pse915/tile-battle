@@ -348,6 +348,8 @@ function hintMove(hand, table, maxN, mustId) {
 // 이 파일은 tools/build-gs.mjs가 rules.js, ai.js와 합쳐 server/Code.gs로 만듭니다.
 // 실시간 방 상태는 CacheService(빠름)에, 방 기록은 연결된 구글 시트에 남깁니다.
 
+// 방 기록을 남길 구글 시트 ID (주소의 /d/와 /edit 사이). 시트에서 연 스크립트라면 비워 둬도 됨
+const SHEET_ID = '';
 const ROOM_TTL = 21600; // 방 상태 보관 시간(초): 6시간
 const BOT_DELAY_MS = 1100; // 봇이 생각하는 시간
 const AWAY_SEC = 45; // 이 시간 동안 소식이 없으면 '자리 비움' → 봇이 대신 둠
@@ -423,7 +425,7 @@ function cleanName(name) {
 function logRoom(room, event, detail) {
   try {
     if (typeof SpreadsheetApp === 'undefined') return;
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
     const sh = ss.getSheetByName('방 기록') || ss.insertSheet('방 기록');
     if (sh.getLastRow() === 0) sh.appendRow(['시간', '방 코드', '일', '참가자', '내용']);
