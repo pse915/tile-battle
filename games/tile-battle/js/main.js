@@ -5,10 +5,12 @@ import { audio } from './audio.js';
 import { Game } from './game.js';
 import { Tutorial } from './tutorial.js';
 import { Online } from './online.js';
-import { onlineReady } from './net.js';
+import { onlineReady } from '../../../shared/net.js';
 import { runSelfTests } from './rules.js';
-import { load, save, loadSettings, saveSettings } from './storage.js';
+import { createStore } from '../../../shared/storage.js';
 import * as ui from './ui.js';
+
+const { load, save, loadSettings, saveSettings } = createStore('tilebattle:');
 
 const $ = ui.$;
 const AI_CAST = [

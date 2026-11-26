@@ -1,9 +1,11 @@
 // 단계형 인터랙티브 튜토리얼 — 실제 3D 테이블에서 정해진 패로 진행
 import { makeTile, checkPlay, sortTiles, SUITS } from './rules.js';
 import { suitIcon } from './tiles.js';
-import { wait } from './anim.js';
+import { wait } from '../../../shared/anim.js';
 import { audio } from './audio.js';
-import { save } from './storage.js';
+import { createStore } from '../../../shared/storage.js';
+
+const { save } = createStore('tilebattle:');
 import * as ui from './ui.js';
 
 const MAXN = 9;

@@ -149,6 +149,7 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------- 메뉴 ---------- */
 .menu-list { display: grid; gap: 12px; }
+a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .menu-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* ---------- 폼 ---------- */

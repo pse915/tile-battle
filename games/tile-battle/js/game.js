@@ -4,7 +4,7 @@ import {
   checkPlay, roundScore, settle,
 } from './rules.js';
 import { chooseMove, hintMove } from './ai.js';
-import { wait } from './anim.js';
+import { wait } from '../../../shared/anim.js';
 import { audio } from './audio.js';
 import * as ui from './ui.js';
 

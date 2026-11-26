@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#061321" />
+  <meta name="description" content="밤바다 위 범선에서 보물을 찾고 해적을 가려내는 숨은 역할 카드 게임" />
+  <title>심해 보물섬 탐험대</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../shared/ui-core.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="labels" aria-hidden="true"></div>
+  <div id="flash" aria-hidden="true"></div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <div id="loading" class="screen is-active"><p class="loading-text">돛을 올리는 중…</p></div>
+
+  <section id="screen-title" class="screen" aria-label="타이틀">
+    <div class="title-wrap">
+      <p class="title-kicker">숨은 역할 카드 게임</p>
+      <h1 class="title">심해 보물섬<br />탐험대</h1>
+      <p class="title-sub">보물을 모두 찾을까, 대왕문어를 깨울까?</p>
+      <button class="btn primary big" id="btn-title-start">출항하기</button>
+    </div>
+  </section>
+
+  <section id="screen-menu" class="screen" aria-label="메인 메뉴">
+    <div class="sheet menu-sheet">
+      <header class="sheet-head">⚓ 심해 보물섬 탐험대</header>
+      <div class="menu-list">
+        <button class="btn primary big" data-go="online">🌐 온라인 방 <small>코드로 친구와 각자 폰에서 (4~6명)</small></button>
+        <button class="btn big" data-go="practice">🤖 봇과 연습 <small>나 + 봇 3명</small></button>
+        <button class="btn" data-go="tutorial">🎓 튜토리얼 다시 보기</button>
+        <div class="menu-row">
+          <button class="btn" data-go="rules">📜 규칙</button>
+          <button class="btn" data-go="settings">⚙️ 설정</button>
+        </div>
+        <a class="btn" href="../../">🏠 다른 게임 고르기</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen" aria-label="설정">
+    <div class="sheet">
+      <header class="sheet-head">설정</header>
+      <div class="field">
+        <label for="vol-bgm">배경음 · 파도 소리 <output id="out-bgm"></output></label>
+        <input type="range" id="vol-bgm" min="0" max="1" step="0.05" />
+      </div>
+      <div class="field">
+        <label for="vol-sfx">효과음 <output id="out-sfx"></output></label>
+        <input type="range" id="vol-sfx" min="0" max="1" step="0.05" />
+      </div>
+      <label class="check"><input type="checkbox" id="chk-mute" /> 모든 소리 끄기</label>
+      <fieldset class="field">
+        <legend>그래픽 품질</legend>
+        <div class="seg">
+          <label><input type="radio" name="quality" value="high" /><span>높음</span></label>
+          <label><input type="radio" name="quality" value="low" /><span>낮음 (느린 PC)</span></label>
+        </div>
+      </fieldset>
+      <div class="sheet-actions">
+        <button class="btn" id="btn-reset-tutorial">튜토리얼 안내 다시 띄우기</button>
+        <button class="btn primary" data-go="menu">완료</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-rules" class="screen" aria-label="규칙">
+    <div class="sheet rules-sheet">
+      <header class="sheet-head">규칙 한눈에 보기</header>
+      <div class="rules-body" id="rules-body"></div>
+      <div class="sheet-actions"><button class="btn primary" data-go="back">닫기</button></div>
+    </div>
+  </section>
+
+  <!-- 게임 HUD -->
+  <div id="hud" hidden>
+    <div class="hud-top">
+      <button class="icon-btn" id="btn-pause" aria-label="메뉴">☰</button>
+      <div class="hud-info">
+        <div class="hud-round" id="hud-round">라운드 1 / 4</div>
+        <div class="hud-table" id="hud-table"></div>
+      </div>
+      <button class="icon-btn" id="btn-sound" aria-label="소리 켜기/끄기">🔊</button>
+      <button class="icon-btn" id="btn-help" aria-label="규칙">?</button>
+    </div>
+    <div class="me-panel" id="me-panel">
+      <button class="role-chip" id="role-chip" aria-label="내 역할 보기"></button>
+      <div class="my-cards" id="my-cards"></div>
+    </div>
+    <aside class="log-panel" id="log-panel" aria-label="말풍선 기록">
+      <button class="log-toggle" id="log-toggle" aria-expanded="false">📜 기록</button>
+      <ol class="log-list" id="log-list"></ol>
+    </aside>
+    <div class="turn-flag" id="turn-flag" hidden>🔑 내 차례! 다른 사람의 카드를 고르세요</div>
+    <div class="action-bar" id="action-bar">
+      <div class="say-bar" id="say-bar" role="group" aria-label="빠른 말풍선"></div>
+      <button class="btn primary" id="btn-flip" hidden>이 카드 뒤집기</button>
+    </div>
+  </div>
+
+  <!-- 튜토리얼 -->
+  <div id="tutorial-layer" hidden>
+    <div class="tut-spot is-none" id="tut-spot"></div>
+    <div class="tut-bubble" id="tut-bubble" role="dialog" aria-live="polite">
+      <div class="tut-progress" id="tut-progress">1/5</div>
+      <h2 id="tut-title"></h2>
+      <div id="tut-body"></div>
+      <div class="tut-actions">
+        <button class="btn small" id="tut-skip">튜토리얼 건너뛰기</button>
+        <span class="spacer"></span>
+        <button class="btn small" id="tut-prev">이전</button>
+        <button class="btn small primary" id="tut-next">다음</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="sheet modal-sheet" role="dialog" aria-modal="true">
+      <header class="sheet-head" id="modal-title"></header>
+      <div id="modal-body"></div>
+      <div class="sheet-actions" id="modal-actions"></div>
+    </div>
+  </div>
+  <div id="banner" class="banner" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript>이 게임은 자바스크립트가 필요해요.</noscript>
+  <script type="module" src="./js/main.js"></script>
+  <script>
+    setTimeout(function () {
+      var l = document.getElementById('loading');
+      if (l && l.classList.contains('is-active')) l.innerHTML = '<p class="loading-text">불러오기가 오래 걸려요. 인터넷 연결을 확인하고 새로고침해 주세요.</p>';
+    }, 15000);
+  </script>
+</body>
+</html>

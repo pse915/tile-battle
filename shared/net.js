@@ -6,14 +6,14 @@ export function apiUrl() {
   const q = new URLSearchParams(location.search).get('api');
   if (q) {
     try {
-      sessionStorage.setItem('tilebattle:api', q);
+      sessionStorage.setItem('games:api', q);
     } catch {
       /* 무시 */
     }
     return q;
   }
   try {
-    return sessionStorage.getItem('tilebattle:api') || ONLINE_URL;
+    return sessionStorage.getItem('games:api') || ONLINE_URL;
   } catch {
     return ONLINE_URL;
   }
