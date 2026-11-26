@@ -7,6 +7,19 @@ registerGame('tile-battle', {
   minPlayers: 3,
   maxPlayers: 5,
 
+  // 🪑 오프라인 테이블 모드: 인원에 맞는 타일을 모두 나눠 주고, 가운데에 내기만 공유 (족보 판정은 말로)
+  offline: {
+    deck: (n) => TileRules.makeDeck(TileRules.maxNForPlayers(n)).map((t) => t.id),
+    deal: (n) => TileRules.handSizeForPlayers(n),
+    zones: [{ id: 'center', name: '가운데', kind: 'pile' }],
+    name: (code) => TileRules.tileLabel(tbTileOf(code)),
+    sort: (a, b) => {
+      const x = tbTileOf(a);
+      const y = tbTileOf(b);
+      return TileRules.valueOf(x, 15) - TileRules.valueOf(y, 15);
+    },
+  },
+
   config(room, req) {
     room.rounds = [3, 5, 7].indexOf(Number(req.rounds)) >= 0 ? Number(req.rounds) : 5;
   },
@@ -159,4 +172,9 @@ function tbEndRound(room, winner) {
   room.result = { round: room.round, winner, scores, delta: s.delta, transfers: s.transfers, over, chips: room.players.map((p) => p.chips) };
   pushEvent(room, Object.assign({ type: 'roundEnd' }, room.result));
   if (over) room.resultText = room.players.map((p) => p.name + ' ' + p.chips).join(' / ');
+}
+
+function tbTileOf(code) {
+  const p = String(code).split('-');
+  return { id: code, n: Number(p[0]), s: Number(p[1]) };
 }

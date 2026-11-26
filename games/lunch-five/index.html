@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#1e6f78" />
+  <meta name="description" content="급식 메뉴 카드를 뒤집다가 같은 메뉴가 딱 5개면 종을 치는 반응 속도 게임. 한 기기 파티, 봇 연습, 온라인 방, 오프라인 테이블" />
+  <title>급식 다섯!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../shared/ui-core.css" />
+  <link rel="stylesheet" href="../../shared/kit.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <noscript>이 게임은 자바스크립트가 필요해요.</noscript>
+  <script type="module" src="./js/main.js"></script>
+  <script>
+    setTimeout(function () {
+      var l = document.getElementById('loading');
+      if (l && l.classList.contains('is-active')) l.innerHTML = '<p class="loading-text">불러오기가 오래 걸려요. 인터넷 연결을 확인하고 새로고침해 주세요.</p>';
+    }, 15000);
+  </script>
+</body>
+</html>

@@ -39,10 +39,28 @@ const ContentService = {
 };
 const Utilities = { getUuid: () => randomUUID() };
 
-const ctx = vm.createContext({ CacheService, LockService, ContentService, Utilities, Math, Date, JSON, console });
-vm.runInContext(readFileSync(join(root, 'server/Code.gs'), 'utf8'), ctx, { filename: 'Code.gs' });
+// Code.gs가 다시 빌드되면 자동으로 새로 불러옴 (방 상태는 그대로 유지)
+let ctx = null;
+let loadedAt = 0;
+function server() {
+  const file = join(root, 'server/Code.gs');
+  const m = statSync(file).mtimeMs;
+  if (!ctx || m !== loadedAt) {
+    const next = vm.createContext({ CacheService, LockService, ContentService, Utilities, Math, Date, JSON, console });
+    try {
+      vm.runInContext(readFileSync(file, 'utf8'), next, { filename: 'Code.gs' });
+      ctx = next;
+      loadedAt = m;
+      console.log('Code.gs 불러옴');
+    } catch (err) {
+      console.error('Code.gs 오류:', err.message);
+      if (!ctx) throw err;
+    }
+  }
+  return ctx;
+}
 
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.md': 'text/plain' };
+const TYPES = { '.gs': 'text/plain', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.md': 'text/plain' };
 
 http
   .createServer((req, res) => {
@@ -52,7 +70,7 @@ http
       req.on('end', () => {
         // 실제 앱스크립트처럼 약간의 지연
         setTimeout(() => {
-          const out = ctx.doPost({ postData: { contents: body } });
+          const out = server().doPost({ postData: { contents: body } });
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
           res.end(out.text);
         }, 120);

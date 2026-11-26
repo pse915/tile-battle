@@ -1,0 +1,93 @@
+/* 오프라인 테이블 모드 + 방 모드 고르기 스타일 — shared/offline-table.js가 불러올 때 자동으로 붙임 (모든 게임 공용) */
+/* ---------- 방 모드 고르기 ---------- */
+.mode-pick .seg span { flex-wrap: wrap; line-height: 1.25; padding-top: 8px; padding-bottom: 8px; }
+.mode-pick .seg span small { display: block; width: 100%; padding-left: 22px; font-family: var(--body); font-size: 0.74rem; color: var(--ink-soft); }
+.mode-tag { margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; background: #e7f0ff; text-align: center; font-size: 0.88rem; }
+.mode-tag.offline { background: #fff3c4; }
+
+/* ---------- 🪑 오프라인 테이블 모드 (shared/offline-table.js) ---------- */
+.ot {
+  position: absolute; inset: calc(60px + var(--safe-t)) 0 0 0;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 0 8px calc(8px + var(--safe-b));
+  overflow-y: auto; overscroll-behavior: contain;
+  --cw: 52px;
+}
+.ot-top { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; }
+.ot-top .btn.small { min-height: 38px; padding: 4px 10px; font-size: 0.88rem; box-shadow: 0 2px 0 var(--ink); }
+.ot-turn { padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.94); font-family: var(--display); }
+.ot-turn.mine { background: var(--hl); animation: bob 1.2s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-3px); } }
+.ot-players { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.ot-players li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; max-width: 100%;
+  padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,.92); border: 2.5px solid transparent;
+  font-size: 0.86rem;
+}
+.ot-players li.turn { border-color: var(--hl); box-shadow: 0 0 0 3px rgba(255,216,77,.45); }
+.ot-players .who { font-family: var(--display); }
+.ot-players .cnt { color: var(--ink-soft); }
+.ot-mini { display: flex; gap: 2px; flex-wrap: wrap; width: 100%; }
+.ot-zones { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+.ot-zone { background: rgba(0,0,0,.28); border-radius: 14px; padding: 6px 8px 8px; color: #fff; min-width: 120px; }
+.ot-zone.rows { flex: 1 1 100%; }
+.ot-zone h4 { margin: 0 0 4px; font-family: var(--display); font-weight: 400; font-size: 0.95rem; }
+.ot-zone h4 small { opacity: .7; font-size: 0.78rem; }
+.ot-draws { display: flex; gap: 6px; }
+.ot-pile-btn {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px;
+  border: 2px solid rgba(255,255,255,.5); border-radius: 10px; background: rgba(255,255,255,.12); color: #fff; cursor: pointer;
+  font-size: 0.8rem; text-align: left; line-height: 1.25;
+}
+.ot-pile-btn img { width: 36px; border-radius: 5px; }
+.ot-pile-btn:active { transform: translateY(2px); }
+.ot-pile { position: relative; display: flex; gap: 3px; flex-wrap: wrap; min-height: calc(var(--cw) * var(--card-ratio)); align-items: center; cursor: pointer; }
+.ot-under { font-size: 0.75rem; opacity: .75; margin-left: 4px; }
+.ot-empty { opacity: .6; font-size: 0.85rem; padding: 6px; }
+.ot-row {
+  display: flex; flex-wrap: wrap; gap: 3px; align-items: center; min-height: calc(var(--cw) * var(--card-ratio) + 8px);
+  margin-bottom: 4px; padding: 3px; border: 2px dashed rgba(255,255,255,.25); border-radius: 10px; cursor: pointer;
+}
+.ot-row-drop { font-size: 0.75rem; opacity: .55; padding: 0 6px; }
+.ot-row.new { width: 100%; background: transparent; color: #fff; font: inherit; font-size: 0.9rem; justify-content: center; }
+.ot-card {
+  flex: none; width: var(--cw); padding: 0; border: 0; border-radius: 7px; background: none; cursor: pointer;
+  transition: transform .12s; box-shadow: 0 3px 6px rgba(0,0,0,.35);
+}
+.ot-card img { display: block; width: 100%; border-radius: 7px; pointer-events: none; }
+.ot-card.small { width: 26px; box-shadow: 0 1px 3px rgba(0,0,0,.3); border-radius: 4px; }
+.ot-card.small img { border-radius: 4px; }
+.ot-card.sel { transform: translateY(-8px); outline: 3px solid var(--hl); outline-offset: 1px; }
+.ot-card.small.sel { transform: translateY(-4px); }
+.ot-card.up:not(.small)::after { content: "공개"; position: relative; top: -16px; display: block; height: 0; font-size: 0.65rem; color: #fff; text-shadow: 0 1px 2px #000; }
+.ot-card[disabled] { cursor: default; }
+.ot-log {
+  margin: 0; padding: 6px 10px; list-style: none; max-height: 92px; overflow-y: auto;
+  background: rgba(255,255,255,.9); border-radius: 12px; font-size: 0.82rem; line-height: 1.5;
+}
+.ot-log:empty { display: none; }
+.ot-log li:last-child { font-weight: 600; }
+.ot-me { margin-top: auto; background: rgba(255,255,255,.95); border-radius: 16px; padding: 6px 8px 8px; box-shadow: 0 -4px 14px rgba(0,0,0,.3); }
+.ot-hand-head { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-family: var(--display); }
+.ot-tip { flex: 1 1 220px; font-family: var(--body); font-size: 0.74rem; color: var(--ink-soft); text-align: right; }
+.ot-hand { display: flex; gap: 4px; overflow-x: auto; padding: 12px 2px 6px; min-height: calc(var(--cw) * var(--card-ratio) + 20px); }
+.ot-hand.blind { justify-content: center; }
+.ot-blind { position: relative; width: 64px; }
+.ot-blind img { width: 100%; border-radius: 8px; box-shadow: 0 4px 0 #0004, 0 8px 0 #0003; }
+.ot-blind b { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-family: var(--display); font-size: 1.5rem; text-shadow: 0 2px 4px #000; }
+.ot-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.ot-actions .btn.small { min-height: 42px; box-shadow: 0 2px 0 var(--ink); }
+.ot-hint { font-size: 0.82rem; color: var(--ink-soft); }
+.ot.is-watch { --cw: clamp(54px, 7vw, 96px); }
+.ot.is-watch .ot-zone h4 { font-size: 1.2rem; }
+.ot-secret { text-align: center; }
+.ot-secret img { width: 140px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+.end-roles { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
+.end-roles li { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 10px; border: 2px solid var(--ink); border-radius: 10px; background: #fff; }
+.end-roles img { width: 26px; border-radius: 3px; }
+.end-roles .who { font-family: var(--display); margin-right: auto; }
+@media (min-width: 900px) { .ot { --cw: 62px; max-width: 1100px; margin: 0 auto; } }
+.ot-root { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.ot-root > * { pointer-events: auto; }
+.ot-bar { position: absolute; top: calc(10px + var(--safe-t)); left: 10px; right: 10px; display: flex; align-items: center; gap: 10px; color: #fff; font-family: var(--display); text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+.ot-pile.spread { cursor: default; }

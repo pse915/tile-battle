@@ -1,0 +1,123 @@
+/* 급식 다섯! — 밝은 급식실, 민트 테이블, 금빛 종 */
+:root {
+  --theme-bg: #1e6f78;
+  --accent: #ffe066;
+  --title-stroke: #c0392b;
+  --lf-bell: #ffc93c;
+  --lf-bell-dark: #b7791f;
+  --lf-mint: #48c9b0;
+}
+
+/* ---------- 버튼 공통: 큰 종 / 뒤집기 ---------- */
+.lf-btn {
+  border: 3px solid var(--ink); border-radius: 18px; cursor: pointer;
+  font-family: var(--display); color: var(--ink);
+  touch-action: none; -webkit-user-select: none; user-select: none;
+  box-shadow: 0 5px 0 var(--ink);
+  transition: transform .06s, box-shadow .06s, opacity .15s;
+}
+.lf-btn:active, .lf-btn.hit { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+.lf-btn.hit { animation: lfhit .25s ease-out; }
+@keyframes lfhit { 0% { filter: brightness(1.4); } 100% { filter: none; } }
+.lf-btn.off { opacity: .4; pointer-events: none; }
+.lf-flip { background: #e9fbf6; font-size: 1.15rem; }
+.lf-flip.on { background: var(--lf-mint); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.25); animation: lfturn 1s ease-in-out infinite; }
+@keyframes lfturn { 50% { box-shadow: 0 5px 0 var(--ink), 0 0 0 6px rgba(72,201,176,.45); } }
+.lf-bell {
+  background: radial-gradient(circle at 35% 30%, #fff3b0 0%, var(--lf-bell) 45%, var(--lf-bell-dark) 100%);
+  font-size: 1.6rem;
+}
+
+/* ---------- 봇 연습 / 온라인: 아래 바 ---------- */
+.lf-bottom { align-items: center; }
+.lf-me-info { color: #fff; font-family: var(--display); text-shadow: 0 2px 4px rgba(0,0,0,.6); font-size: 1rem; }
+.lf-me-info .lf-go { color: var(--accent); }
+.lf-me-row { display: flex; gap: 12px; width: min(520px, 100%); }
+.lf-me-row .lf-flip { flex: 1; min-height: 64px; }
+.lf-me-row .lf-bell { flex: 1.4; min-height: 76px; font-size: 1.8rem; }
+.lf-note {
+  position: absolute; top: calc(66px + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100% - 20px)); padding: 5px 10px; border-radius: 10px;
+  background: rgba(255,243,196,.95); font-size: 0.8rem; text-align: center; line-height: 1.35;
+  pointer-events: none !important;
+}
+.lf-net { background: #fff3c4; border-radius: 10px; padding: 6px 10px; margin: 0 0 10px; }
+
+/* ---------- 👥 한 기기 파티: 가장자리 패드 ---------- */
+.lf-pads { position: absolute; inset: 0; pointer-events: none !important; }
+.lf-pad {
+  --ph: 108px;
+  position: absolute; width: var(--pw); height: var(--ph);
+  pointer-events: auto; touch-action: none;
+}
+.lf-pad.e-bottom, .lf-pad.e-top { --pw: min(560px, calc(100vw - 150px)); left: 50%; }
+.lf-pad.e-bottom { bottom: calc(6px + var(--safe-b)); transform: translateX(-50%); }
+.lf-pad.e-top { top: 6px; transform: translateX(-50%) rotate(180deg); }
+.lf-pad.e-left, .lf-pad.e-right { --pw: min(440px, calc(100vh - 300px)); top: 50%; }
+.lf-pad.e-left { left: calc(6px + var(--ph) / 2); transform: translate(-50%, -50%) rotate(90deg); }
+.lf-pad.e-right { left: calc(100% - 6px - var(--ph) / 2); transform: translate(-50%, -50%) rotate(-90deg); }
+.lf-pad-in {
+  position: relative; width: 100%; height: 100%;
+  display: grid; grid-template-columns: 1fr 1.45fr; grid-template-rows: auto 1fr; gap: 4px 8px;
+  padding: 5px 8px 9px; border-radius: 20px;
+  background: rgba(255,255,255,.88); border: 3px solid transparent;
+  box-shadow: 0 6px 16px rgba(0,0,0,.3);
+}
+.lf-pad.turn .lf-pad-in { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(255,224,102,.6), 0 6px 16px rgba(0,0,0,.3); }
+.lf-pad.out .lf-pad-in { opacity: .45; }
+.lf-pad-name { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 6px; font-family: var(--display); font-size: 0.95rem; white-space: nowrap; overflow: hidden; }
+.lf-pad-name span { overflow: hidden; text-overflow: ellipsis; }
+.lf-pad .lf-flip { min-height: 0; font-size: 1rem; }
+.lf-pad .lf-bell { min-height: 0; font-size: 2rem; }
+.lf-pad-msg {
+  position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  padding: 4px 12px; border-radius: 12px; background: var(--ink); color: #fff;
+  font-family: var(--display); white-space: nowrap; opacity: 0; pointer-events: none;
+}
+.lf-pad-msg.show { animation: lfmsg 1.6s ease-out forwards; }
+.lf-pad-msg.bad { background: #d9486a; }
+@keyframes lfmsg { 0% { opacity: 0; } 10%, 75% { opacity: 1; } 100% { opacity: 0; } }
+.lf-pad.lf-shake .lf-pad-in { animation: lfshake .45s; }
+@keyframes lfshake { 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+
+/* 한 기기 파티 중에는 위쪽 HUD를 왼쪽 위 모서리로 */
+.lf-hot .hud-top { right: auto; left: 6px; top: 6px; flex-direction: column; align-items: flex-start; }
+.lf-hot .hud-info, .lf-hot #btn-help { display: none; }
+.lf-hot .hud-top .icon-btn { width: 40px; height: 40px; }
+
+/* 이름표 */
+.lf-label.lf-out { opacity: .5; filter: grayscale(1); }
+.lf-label.lf-shake { animation: lfshakeM .45s; }
+@keyframes lfshakeM { 20% { margin-left: -8px; } 40% { margin-left: 8px; } 60% { margin-left: -5px; } 80% { margin-left: 5px; } }
+.lf-label .bubble { background: #15803d; }
+
+/* 📺 테이블 화면 */
+.lf-watch .hud-table { font-size: 1.3rem; }
+
+/* 🪑 오프라인 테이블: 공개 카드를 크게 (📺 테이블 화면은 더 크게) */
+.lf-offline .ot { --cw: 60px; }
+.lf-offline .ot.is-watch { --cw: clamp(90px, 13vw, 190px); }
+.lf-offline .ot-zone.per { min-width: calc(var(--cw) + 30px); }
+.lf-offline .ot-pile .ot-card { width: var(--cw); }
+
+/* 튜토리얼·규칙 그림 */
+.lf-menus { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.lf-menus span { display: flex; flex-direction: column; align-items: center; font-family: var(--display); font-size: 0.85rem; }
+.lf-menus img, .rules-body .lf-menus img { width: 52px; height: 52px; border-radius: 0; }
+.lf-ex { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-family: var(--display); }
+.lf-tcard { width: 42px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.lf-ex .yes { color: var(--ok); margin-left: auto; }
+.lf-ex .no { color: var(--omr); margin-left: auto; }
+.lf-quiz { display: flex; gap: 10px; margin-top: 8px; }
+.lf-quiz .btn { flex: 1; min-height: 56px; }
+.lf-quiz-n { font-family: var(--display); text-align: center; margin: 6px 0 0; color: var(--ink-soft); }
+
+/* 이름 입력 */
+.lf-names label { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 8px; font-family: var(--display); }
+
+@media (max-width: 560px) {
+  .lf-me-row .lf-flip { min-height: 56px; font-size: 1rem; }
+  .lf-me-row .lf-bell { min-height: 66px; }
+  .lf-note { font-size: 0.72rem; top: calc(60px + var(--safe-t)); }
+  .lf-pad { --ph: 96px; }
+}

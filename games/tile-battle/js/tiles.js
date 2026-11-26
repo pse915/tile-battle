@@ -234,3 +234,10 @@ export function createBackMesh() {
   return mesh;
 }
 
+
+let backUrl = null;
+/** HTML에서 쓸 타일 뒷면 그림 (오프라인 테이블 모드) */
+export function tileBackImage() {
+  if (!backUrl) backUrl = backCanvas().toDataURL();
+  return backUrl;
+}

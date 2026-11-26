@@ -333,3 +333,7 @@ output { float: right; font-family: var(--body); color: var(--ink-soft); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- 튜토리얼 말풍선 아래로 ---------- */
+.tut-bubble.at-bottom { top: auto; bottom: calc(12px + var(--safe-b)); }
+

@@ -6,6 +6,25 @@ registerGame('deep-sea', {
   title: '심해 보물섬 탐험대',
   minPlayers: 4,
   maxPlayers: 6,
+
+  // 🪑 오프라인 테이블 모드: 역할은 비밀로 1장씩, 방 카드는 5장씩 (내 구성만 보이고 자리는 섞여 있음)
+  // 열쇠를 가진 사람이 남의 카드를 고르면 뒤집혀 가운데로, 뒤집힌 사람에게 열쇠(차례)가 넘어감
+  offline: {
+    deck: (n) => DSRules.makeRoomCards(n).map((c) => c.type),
+    deal: 5,
+    secret: (n) => {
+      const r = DSRules.roleCards(n);
+      const out = [];
+      for (let i = 0; i < r.crew; i++) out.push('crew');
+      for (let i = 0; i < r.pirate; i++) out.push('pirate');
+      return out;
+    },
+    hideOrder: true,
+    pickPassesTurn: true,
+    zones: [{ id: 'found', name: '뒤집힌 카드', kind: 'pile' }],
+    name: (c) => DSRules.CARD_NAME[c] || DSRules.ROLE_NAME[c] || c,
+    sort: (a, b) => ['treasure', 'monster', 'empty'].indexOf(a) - ['treasure', 'monster', 'empty'].indexOf(b),
+  },
   bots: [
     { name: '갈매기 봇', emoji: '🐦' },
     { name: '거북이 봇', emoji: '🐢' },

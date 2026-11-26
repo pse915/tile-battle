@@ -1,0 +1,29 @@
+/* 흑백 뒤집기 대전 — 보드게임 카페의 나무 테이블 */
+:root {
+  --theme-bg: #17110c;
+  --accent: #ffe36a;
+  --title-stroke: #1f6b46;
+}
+.fd-chips {
+  position: absolute; top: calc(62px + var(--safe-t)); left: 10px; right: 10px;
+  display: flex; justify-content: space-between; gap: 8px; pointer-events: none !important;
+}
+.fd-chip {
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 48%;
+  padding: 6px 12px 6px 8px; border-radius: 999px; border: 3px solid transparent;
+  background: rgba(255,255,255,.95); box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  font-family: var(--display);
+}
+.fd-chip .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd-chip b { font-size: 1.3rem; margin-left: auto; }
+.fd-chip .disc, .fd-score .disc { flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-block; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
+.fd-chip.black .disc, .fd-score .disc.b { background: #1a1a1f; }
+.fd-chip.white .disc, .fd-score .disc.w { background: #f4f1e8; border: 2px solid #999; }
+.fd-chip.turn { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(255,227,106,.45), 0 4px 12px rgba(0,0,0,.4); }
+.fd-flag { bottom: calc(18px + var(--safe-b)); }
+.fd-score { display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--display); font-size: 2.2rem; margin: 4px 0; }
+.fd-score .disc { width: 30px; height: 30px; }
+@media (max-width: 560px) {
+  .fd-chip { padding: 4px 10px 4px 6px; font-size: 0.86rem; }
+  .fd-chip b { font-size: 1.1rem; }
+}

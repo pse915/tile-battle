@@ -7,7 +7,6 @@ import { Tutorial } from './tutorial.js';
 import { runSelfTests, CARD_NAME } from './rules.js';
 import { Lobby } from '../../../shared/lobby.js';
 import { createStore, common } from '../../../shared/storage.js';
-import { onlineReady } from '../../../shared/net.js';
 import * as ui from '../../../shared/ui-core.js';
 
 const $ = ui.$;
@@ -35,6 +34,7 @@ async function boot() {
     game: 'deep-sea',
     title: '심해 보물섬 탐험대',
     audio,
+    offline: true,
     onGameState: (s, first) => game.onState(s, first),
     onLeaveGame: () => game.exit(),
     onBack: () => goMenu(),
@@ -70,8 +70,12 @@ function goMenu() {
 async function enterFromTitle() {
   audio.unlock();
   audio.startBgm();
-  const room = new URLSearchParams(location.search).get('room');
-  if (room && /^[0-9]{4}$/.test(room)) return lobby.open(room);
+  const q = new URLSearchParams(location.search);
+  const room = q.get('room');
+  if (room && /^[0-9]{4}$/.test(room)) {
+    if (q.get('view') === 'table') return lobby.watch(room).catch((err) => ui.toast(err.message, 3000));
+    return lobby.open(room);
+  }
   ui.showScreen('screen-menu');
   if (!store.load('tutorialDone', false)) {
     const go = await ui.modal({
@@ -99,7 +103,6 @@ function startTutorial() {
 }
 
 async function startPractice() {
-  if (!onlineReady()) return ui.toast('연습 모드도 온라인 서버가 필요해요. README의 설정을 확인해 주세요.', 3000);
   const nick = common.load('nick', '') || '나';
   ui.toast('봇들을 부르는 중…', 2500);
   try {

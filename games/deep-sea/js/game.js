@@ -5,6 +5,21 @@ import { wait } from '../../../shared/anim.js';
 import { audio } from './audio.js';
 import * as ui from '../../../shared/ui-core.js';
 import { buildLabels, clearLabels, updateLabel, seatBubble, positionLabels } from './labels.js';
+import { OfflineTable, createOfflineRoot, removeOfflineRoot } from '../../../shared/offline-table.js';
+
+/** 🪑 오프라인 테이블 모드 화면 설정 (서버 구성품: server/games/deep-sea.js의 offline) */
+const OFFLINE_CFG = {
+  zones: [{ id: 'found', name: '뒤집힌 카드', kind: 'pile', spread: true }],
+  actions: { pick: true, redeal: true },
+  hideOrder: true,
+  cardImg: (c) => cardImage(c),
+  backImg: () => cardImage('back'),
+  secretImg: (c) => cardImage(c),
+  secretName: (c) => ROLE_NAME[c],
+  redealDefault: (round) => Math.max(2, 5 - round),
+  cardRatio: 1.44,
+  tips: '역할은 🎭에서 몰래 확인! 말은 직접 얼굴 보며, 열쇠 가진 사람이 남의 카드를 골라 뒤집어요. 사람 수만큼 뒤집으면 방장이 ‘다시 나누기’',
+};
 
 const $ = ui.$;
 const SAY_ORDER = ['t0', 't1', 't2', 't3', 'm0', 'm1', 'sus', 'trust', 'pass'];
@@ -50,6 +65,11 @@ export class DeepSeaGame {
   // ---------- 상태 받기 ----------
   onState(s, first) {
     this.state = s;
+    if (s.mode === 'offline') return this.offlineState(s);
+    if (s.mySeat < 0) {
+      ui.toast('📺 테이블 화면은 오프라인 테이블 모드 방에서만 쓸 수 있어요.', 3000);
+      return this.onExit();
+    }
     if (first || !this.inGame) {
       this.enter(s);
       return;
@@ -83,7 +103,28 @@ export class DeepSeaGame {
     else if (s.ds.revealed.length === 0 && s.ds.round === 1) this.showRole();
   }
 
+  /** 오프라인 테이블 모드: 공용 화면(shared/offline-table.js)에 맡기고 3D 바다는 배경으로 */
+  offlineState(s) {
+    if (!this.ot) {
+      this.inGame = true;
+      ui.showScreen(null);
+      $('#hud').hidden = true;
+      this.stage.setTitleMode(true);
+      const root = createOfflineRoot('심해 보물섬 탐험대 · 🪑 오프라인 테이블', () => this.onExit());
+      this.ot = new OfflineTable({ root, lobby: this.lobby, cfg: OFFLINE_CFG, audio });
+      this.onEnter?.();
+    }
+    this.ot.render(s);
+  }
+
   exit() {
+    if (this.ot) {
+      this.ot = null;
+      removeOfflineRoot();
+      ui.closeModal();
+      this.inGame = false;
+      return;
+    }
     if (!this.inGame) return;
     this.inGame = false;
     this.queue = [];

@@ -1,0 +1,75 @@
+/* 컬러 러시 — 칠판 교실 + 형광펜 */
+:root {
+  --theme-bg: #14211d;
+  --accent: #7ff0d2;
+  --title-stroke: #ff5ca8;
+}
+.title { text-shadow: 6px 6px 0 rgba(58, 214, 180, 0.55), -4px -3px 0 rgba(255, 154, 46, 0.45); }
+
+/* 위쪽: 지금 색 · 방향 */
+.cr-top {
+  position: absolute; top: calc(62px + var(--safe-t)); left: 10px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  pointer-events: none !important;
+}
+.cr-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 6px; border-radius: 999px;
+  background: rgba(255,255,255,.95); border: 3px solid var(--cc, #fff);
+  box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  font-family: var(--display); font-size: 1rem; white-space: nowrap;
+}
+.cr-chip.small { padding: 3px 10px; font-size: 0.85rem; border-color: transparent; }
+.cr-chip .dot {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25);
+}
+.cr-chip .dot img { width: 20px; height: 20px; filter: brightness(1.15); }
+
+/* 안내 깃발 */
+.cr-flag { bottom: calc(196px + var(--safe-b)); }
+.cr-flag.mine { background: #7ff0d2; }
+
+/* 아래 손패 */
+.cr-bottom { gap: 4px; }
+.cr-bottom .k-hand { padding-top: 18px; }
+.k-card.ok { box-shadow: 0 0 0 4px #7ee08a, 0 6px 12px rgba(0,0,0,.45); transform: translateY(-6px); }
+.k-card.ok.sel { transform: translateY(-14px); }
+.k-card.dim { opacity: .5; filter: saturate(.6); }
+.cr-last { background: #ff5ca8; color: #fff; border-color: #6a1240; box-shadow: 0 3px 0 #6a1240; }
+.cr-last.is-armed { background: #ffe36a; color: var(--ink); }
+.cr-last.pulse, .cr-catch { animation: crpulse .7s ease-in-out infinite; }
+.cr-catch { background: #ff9a2e; color: #fff; border-color: #6b3300; box-shadow: 0 3px 0 #6b3300; }
+@keyframes crpulse { 50% { transform: scale(1.07); } }
+
+/* 이름표: 한 장 남은 사람 */
+.seat-label.danger { background: #fff1f7; }
+.seat-label.danger .meta { color: #c2185b; font-weight: 600; }
+.seat-label[hidden] { display: none; }
+
+/* 색 고르기 */
+.cr-swatches .btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--sw); color: #fff; text-shadow: 0 2px 2px rgba(0,0,0,.35);
+}
+.cr-swatches .btn img { width: 40px; height: 40px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+.cr-swatches .btn span { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+.cr-swatches .btn small { font-family: var(--body); font-size: 0.75rem; opacity: .95; }
+
+/* 결과 */
+.cr-result { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 6px; }
+.cr-result li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(29,43,79,.06); font-family: var(--display); }
+.cr-result li.win { background: #fff6c8; border: 2px solid var(--hl); }
+
+/* 튜토리얼 · 규칙 카드 그림 */
+.cr-tut-cards { display: flex; gap: 6px; flex-wrap: wrap; }
+.cr-tut-cards img { width: 44px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.rules-body img { width: 26px; }
+
+@media (max-width: 560px) {
+  .cr-flag { bottom: calc(166px + var(--safe-b)); }
+  .cr-chip { font-size: 0.86rem; padding: 3px 10px 3px 4px; }
+  .cr-chip .dot { width: 22px; height: 22px; }
+  .cr-chip .dot img { width: 16px; height: 16px; }
+  .k-actions .btn { padding: 6px 10px; font-size: 0.92rem; }
+}

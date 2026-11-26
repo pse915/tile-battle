@@ -89,8 +89,10 @@ async function enterMenuFromTitle() {
   audio.unlock();
   audio.startBgm();
   // 초대 링크(?room=1234)로 들어오면 바로 참여 화면
-  const room = new URLSearchParams(location.search).get('room');
+  const q = new URLSearchParams(location.search);
+  const room = q.get('room');
   if (room && /^[0-9]{4}$/.test(room)) {
+    if (q.get('view') === 'table') return online.watch(room).catch((err) => ui.toast(err.message, 3000));
     openOnline(room);
     return;
   }
@@ -192,6 +194,7 @@ function bindOnline() {
   $('#btn-lobby-start').addEventListener('click', () => online.startGame());
   $('#btn-copy-code').addEventListener('click', () => copyText(online.code, `방 코드 ${online.code}를 복사했어요`));
   $('#btn-copy-link').addEventListener('click', () => copyText(online.shareLink(), '초대 링크를 복사했어요'));
+  $('#btn-copy-table').addEventListener('click', () => copyText(online.shareLink() + '&view=table', '테이블 화면 링크를 복사했어요. 교실 TV나 패드에서 여세요'));
   document.querySelectorAll('[data-bot]').forEach((b) => b.addEventListener('click', () => online.send('addBot', { difficulty: b.dataset.bot })));
   $('#lobby-players').addEventListener('click', (e) => {
     const id = e.target.closest('[data-remove]')?.dataset.remove;

@@ -1,5 +1,6 @@
 // 앱스크립트 웹 앱과 주고받기
 import { ONLINE_URL } from './config.js';
+import { localServer } from './local-server.js';
 
 /** 테스트용: ?api=주소 로 서버를 바꿀 수 있음 (탭을 닫으면 원래대로) */
 export function apiUrl() {
@@ -24,8 +25,14 @@ export const onlineReady = () => !!apiUrl();
 /**
  * 서버 호출. text/plain으로 보내야 앱스크립트에서 CORS 사전 요청이 생기지 않음.
  * 실패하면 Error(사용자에게 보여줄 한국어 메시지)를 던짐.
+ * opts.local이면 이 기기 안의 서버(shared/local-server.js)로 보냄.
  */
-export async function api(action, payload = {}) {
+export async function api(action, payload = {}, opts = {}) {
+  if (opts.local) {
+    const data = (await localServer())({ action, ...payload });
+    if (!data.ok) throw Object.assign(new Error(data.error || '알 수 없는 오류예요.'), { data });
+    return data;
+  }
   let res;
   try {
     res = await fetch(apiUrl(), {
