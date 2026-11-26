@@ -40,6 +40,13 @@ function registerGame(id, mod) {
 function gameOf(room) {
   return GAMES[room.game] || fail('알 수 없는 게임이에요.');
 }
+/** 지금 방에서 규칙을 맡는 모듈: 오프라인 테이블 모드면 공용 엔진(server/offline-table.js) */
+function modOf(room) {
+  const g = gameOf(room);
+  if (room.mode !== 'offline' || !g.offline) return g;
+  if (!g.offlineMod) g.offlineMod = offlineModule(g);
+  return g.offlineMod;
+}
 
 function doGet() {
   return toJson({ ok: true, service: 'school-games', games: Object.keys(GAMES), time: Date.now() });
@@ -131,6 +138,7 @@ function handleRequest(req) {
   if (action === 'lookup') return lookupRoom(code);
   if (action === 'join') return withLock(() => joinRoom(code, req));
   if (action === 'poll') return pollRoom(code, req);
+  if (action === 'watch') return watchRoom(code, req);
 
   return withLock(() => {
     const room = loadRoom(code);
@@ -138,7 +146,7 @@ function handleRequest(req) {
     const me = room.players.find((p) => p.id === req.pid);
     if (!me) fail('이 방의 참가자가 아니에요.');
     markSeen(code, me.id);
-    const g = gameOf(room);
+    const g = modOf(room);
     const isHost = room.hostId === me.id;
     const hostOnly = () => isHost || fail('방장만 할 수 있어요.');
     switch (action) {
@@ -169,7 +177,7 @@ function handleRequest(req) {
         break;
       case 'lobby':
         hostOnly();
-        if (room.status === 'playing') fail('게임 중에는 대기방으로 갈 수 없어요.');
+        if (room.status === 'playing' && room.mode !== 'offline') fail('게임 중에는 대기방으로 갈 수 없어요.');
         room.players = room.players.filter((p) => !p.left);
         g.reset(room);
         room.status = 'lobby';
@@ -203,13 +211,14 @@ function createRoom(req) {
     version: 0,
     created: Date.now(),
     status: 'lobby',
+    mode: req.mode === 'offline' && GAMES[game].offline ? 'offline' : 'online',
     hostId: host.id,
     rounds: 5,
     players: [host],
     events: [],
     seq: 0,
   };
-  GAMES[game].reset(room);
+  modOf(room).reset(room);
   saveRoom(room);
   markSeen(code, host.id);
   logRoom(room, '방 만듦');
@@ -219,7 +228,7 @@ function createRoom(req) {
 function lookupRoom(code) {
   const room = loadRoom(code);
   if (!room) fail('그런 방이 없어요. 코드를 확인해 주세요.');
-  return { ok: true, code, game: room.game, title: gameOf(room).title, status: room.status, count: room.players.length };
+  return { ok: true, code, game: room.game, mode: room.mode || 'online', title: gameOf(room).title, status: room.status, count: room.players.length };
 }
 
 function makePlayer(name, players) {
@@ -239,7 +248,7 @@ function joinRoom(code, req) {
     markSeen(code, again.id);
     return roomView(room, again.id);
   }
-  const g = gameOf(room);
+  const g = modOf(room);
   if (room.status !== 'lobby') fail('이미 게임이 시작된 방이에요.');
   if (room.players.length >= g.maxPlayers) fail('방이 가득 찼어요 (최대 ' + g.maxPlayers + '명).');
   const p = makePlayer(req.name, room.players);
@@ -258,8 +267,8 @@ function leaveRoom(room, me) {
     me.left = true;
     me.bot = true;
     me.difficulty = 'normal';
-    me.name = me.name.slice(0, 6) + '(봇)';
-    const g = gameOf(room);
+    me.name = me.name.slice(0, 6) + (room.mode === 'offline' ? '(나감)' : '(봇)');
+    const g = modOf(room);
     if (g.onLeave) g.onLeave(room, me);
   }
   const humans = room.players.filter((p) => !p.bot);
@@ -272,7 +281,8 @@ function leaveRoom(room, me) {
 }
 
 function addBot(room, difficulty) {
-  const g = gameOf(room);
+  if (room.mode === 'offline') fail('오프라인 테이블 모드는 봇 없이 사람끼리 모여서 해요.');
+  const g = modOf(room);
   if (room.status !== 'lobby') fail('대기방에서만 봇을 넣을 수 있어요.');
   if (room.players.length >= g.maxPlayers) fail('방이 가득 찼어요 (최대 ' + g.maxPlayers + '명).');
   const cast = g.bots || DEFAULT_BOTS;
@@ -296,8 +306,8 @@ function isAway(room, p, seenMap) {
 }
 
 function needsAutoMove(room, seenMap) {
-  if (room.status !== 'playing') return false;
-  const g = gameOf(room);
+  if (room.status !== 'playing' || room.mode === 'offline') return false;
+  const g = modOf(room);
   const seat = g.actor(room);
   const p = room.players[seat];
   if (!p || (!p.bot && !isAway(room, p, seenMap))) return false;
@@ -314,7 +324,7 @@ function pollRoom(code, req) {
     room = withLock(() => {
       const r = loadRoom(code);
       if (r && needsAutoMove(r, seenMapFor(r))) {
-        const g = gameOf(r);
+        const g = modOf(r);
         g.botMove(r, g.actor(r));
         r.lastActionAt = Date.now();
         if (r.status === 'finished' && r.resultText) logRoom(r, '게임 끝', r.resultText);
@@ -329,8 +339,16 @@ function pollRoom(code, req) {
 }
 
 /** 각 참가자에게 보내는 화면용 상태 — 숨김 정보는 게임 모듈의 view가 걸러 냄 */
+/** 📺 테이블 화면: 참가하지 않고 공용 판만 보기 (숨김 정보 없음) */
+function watchRoom(code, req) {
+  const room = loadRoom(code);
+  if (!room) return { ok: false, gone: true, error: '방이 사라졌어요.' };
+  if (Number(req.since) === room.version) return { ok: true, same: true, version: room.version };
+  return roomView(room, null);
+}
+
 function roomView(room, pid) {
-  const g = gameOf(room);
+  const g = modOf(room);
   const seen = seenMapFor(room);
   const mySeat = room.players.findIndex((p) => p.id === pid);
   const base = {
@@ -342,6 +360,8 @@ function roomView(room, pid) {
     minPlayers: g.minPlayers,
     maxPlayers: g.maxPlayers,
     status: room.status,
+    mode: room.mode || 'online',
+    hasOffline: !!gameOf(room).offline,
     hostId: room.hostId,
     rounds: room.rounds,
     me: pid,

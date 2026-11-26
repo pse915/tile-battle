@@ -1,0 +1,114 @@
+/* 새 게임 공용 스타일 (shell.js 화면 + 손패 바 + 이름표 + 기록) — ui-core.css 다음에 불러옴
+   게임별 style.css에서 --theme-bg, --accent 등을 바꿔 테마를 입힘 */
+:root {
+  --theme-bg: #20242c;
+  --accent: var(--hl);
+  --title-stroke: var(--ink);
+}
+html, body { background: var(--theme-bg); }
+#loading { background: var(--theme-bg); }
+a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* 타이틀 */
+#screen-title { background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.55) 100%); }
+.title-wrap { text-align: center; color: #fff; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); padding: 0 16px; }
+.title-kicker { margin: 0; font-family: var(--display); color: var(--accent); font-size: 1.1rem; }
+.title { margin: 6px 0 8px; font-family: var(--display); font-weight: 400; font-size: clamp(2.6rem, 12vw, 5.4rem); line-height: 1.04; color: #fff; -webkit-text-stroke: 2px var(--title-stroke); }
+.title-sub { margin: 0 0 24px; opacity: 0.94; }
+.title-wrap .btn { display: inline-flex; padding: 10px 40px; }
+
+/* HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#hud > *, #hud-body > * { pointer-events: auto; }
+#hud-body { position: absolute; inset: 0; pointer-events: none; }
+.hud-top { position: absolute; top: calc(10px + var(--safe-t)); left: 10px; right: 10px; display: flex; align-items: center; gap: 8px; pointer-events: none; z-index: 2; }
+.hud-top > * { pointer-events: auto; }
+.hud-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; pointer-events: none !important; }
+.hud-round { font-family: var(--display); color: var(--accent); font-size: 0.95rem; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+.hud-table {
+  max-width: 100%; margin-top: 4px; padding: 6px 14px;
+  background: rgba(255,255,255,0.95); border-radius: 999px;
+  font-family: var(--display); font-size: 0.98rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 3px 10px rgba(0,0,0,.35);
+}
+.hud-table:empty, .hud-round:empty { display: none; }
+
+/* 아래쪽 손패 + 버튼 */
+.k-bottom {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 6px 8px calc(8px + var(--safe-b));
+  display: flex; flex-direction: column; gap: 6px;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 35%);
+}
+.k-hand { display: flex; gap: 4px; overflow-x: auto; overflow-y: visible; padding: 16px 4px 4px; justify-content: safe center; scrollbar-width: thin; }
+.k-card {
+  flex: none; width: var(--k-cw, 62px); padding: 0; border: 0; background: none; cursor: pointer;
+  border-radius: 8px; transition: transform .12s, opacity .12s; box-shadow: 0 4px 8px rgba(0,0,0,.4);
+  touch-action: manipulation;
+}
+.k-card img { display: block; width: 100%; border-radius: 8px; pointer-events: none; }
+.k-card.sel { transform: translateY(-12px); outline: 3px solid var(--hl); outline-offset: 1px; }
+.k-card.ok { box-shadow: 0 0 0 3px #7ee08a, 0 4px 8px rgba(0,0,0,.4); }
+.k-card.dim { opacity: .55; }
+.k-card:active { transform: translateY(-6px) scale(.97); }
+.k-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.k-actions .btn { min-height: 48px; }
+.k-flag {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  padding: 6px 14px; max-width: calc(100% - 24px);
+  background: var(--hl); border: 2.5px solid var(--ink); border-radius: 12px;
+  font-family: var(--display); font-size: 1.02rem; text-align: center; white-space: nowrap;
+  pointer-events: none !important;
+  animation: kbob 1.2s ease-in-out infinite;
+}
+@keyframes kbob { 50% { margin-top: -4px; } }
+
+/* 이름표 (3D 자리 위에 띄움) */
+.seat-label {
+  position: absolute; left: 0; top: 0;
+  padding: 4px 10px 4px 6px;
+  background: rgba(255,255,255,0.95);
+  border: 2.5px solid transparent; border-radius: 14px;
+  display: flex; align-items: center; gap: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  font-size: 0.8rem; white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+.seat-label.turn { border-color: var(--hl); box-shadow: 0 0 0 4px rgba(255,216,77,.5), 0 4px 12px rgba(0,0,0,.35); }
+.seat-label .avatar { font-size: 1.4rem; line-height: 1; }
+.seat-label .name { font-family: var(--display); font-size: 0.95rem; display: block; }
+.seat-label .meta { color: var(--ink-soft); }
+.seat-label .bubble {
+  position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  padding: 3px 10px; background: var(--ink); color: #fff; border-radius: 10px;
+  font-family: var(--display); font-size: 0.9rem; white-space: nowrap;
+  opacity: 0; transition: opacity .2s;
+}
+.seat-label .bubble.show { opacity: 1; }
+
+/* 기록 */
+.k-log {
+  position: absolute; right: 10px; top: calc(62px + var(--safe-t));
+  width: 220px; max-height: 40vh; display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.94); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.35); overflow: hidden;
+}
+.k-log > button { border: 0; background: var(--ink); color: #fff; font-family: var(--display); font-size: 0.95rem; min-height: 36px; cursor: pointer; }
+.k-log ol { margin: 0; padding: 6px 10px 8px; list-style: none; overflow-y: auto; font-size: 0.82rem; line-height: 1.45; }
+.k-log li { padding: 2px 0; border-bottom: 1px dashed var(--omr-line); }
+.rules-body img { width: 28px; vertical-align: -7px; border-radius: 4px; }
+.k-swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.k-swatches .btn { min-height: 64px; font-size: 1.15rem; }
+
+@media (max-width: 760px) {
+  .k-log { width: auto; max-height: 36px; }
+  .k-log.open { max-height: 44vh; width: min(280px, calc(100% - 20px)); }
+  .k-log:not(.open) ol { display: none; }
+}
+@media (max-width: 560px) {
+  .k-card { width: var(--k-cw-m, 48px); }
+  .seat-label { padding: 3px 7px 3px 5px; gap: 4px; font-size: 0.72rem; }
+  .seat-label .avatar { font-size: 1.1rem; }
+  .seat-label .name { font-size: 0.82rem; }
+  .k-flag { font-size: 0.9rem; }
+}

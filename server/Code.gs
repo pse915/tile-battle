@@ -1,9 +1,9 @@
 // ⚠️ 자동 생성 파일입니다. 직접 고치지 말고 tools/build-gs.mjs를 다시 실행하세요.
 // 학교 게임 모음 — 공용 온라인 대기방 서버 (Google Apps Script)
-// 포함된 게임: tile-battle, deep-sea
+// 포함된 게임: tile-battle, deep-sea, flip-duel
 // 설정 방법은 README.md의 '온라인 대기방 설정'을 보세요.
 
-// ==================== 공용 대기방 (server/core.js) ====================
+// ==================== server/core.js ====================
 // ===== 공용 온라인 대기방 서버 (Google Apps Script 웹 앱) =====
 // 방 만들기·참여·나가기, 4자리 코드, 방장, 봇, 폴링, 자리 비움 처리를 맡고
 // 실제 규칙은 server/games/*.js 의 게임 모듈이 처리합니다.
@@ -45,6 +45,13 @@ function registerGame(id, mod) {
 }
 function gameOf(room) {
   return GAMES[room.game] || fail('알 수 없는 게임이에요.');
+}
+/** 지금 방에서 규칙을 맡는 모듈: 오프라인 테이블 모드면 공용 엔진(server/offline-table.js) */
+function modOf(room) {
+  const g = gameOf(room);
+  if (room.mode !== 'offline' || !g.offline) return g;
+  if (!g.offlineMod) g.offlineMod = offlineModule(g);
+  return g.offlineMod;
 }
 
 function doGet() {
@@ -137,6 +144,7 @@ function handleRequest(req) {
   if (action === 'lookup') return lookupRoom(code);
   if (action === 'join') return withLock(() => joinRoom(code, req));
   if (action === 'poll') return pollRoom(code, req);
+  if (action === 'watch') return watchRoom(code, req);
 
   return withLock(() => {
     const room = loadRoom(code);
@@ -144,7 +152,7 @@ function handleRequest(req) {
     const me = room.players.find((p) => p.id === req.pid);
     if (!me) fail('이 방의 참가자가 아니에요.');
     markSeen(code, me.id);
-    const g = gameOf(room);
+    const g = modOf(room);
     const isHost = room.hostId === me.id;
     const hostOnly = () => isHost || fail('방장만 할 수 있어요.');
     switch (action) {
@@ -175,7 +183,7 @@ function handleRequest(req) {
         break;
       case 'lobby':
         hostOnly();
-        if (room.status === 'playing') fail('게임 중에는 대기방으로 갈 수 없어요.');
+        if (room.status === 'playing' && room.mode !== 'offline') fail('게임 중에는 대기방으로 갈 수 없어요.');
         room.players = room.players.filter((p) => !p.left);
         g.reset(room);
         room.status = 'lobby';
@@ -209,13 +217,14 @@ function createRoom(req) {
     version: 0,
     created: Date.now(),
     status: 'lobby',
+    mode: req.mode === 'offline' && GAMES[game].offline ? 'offline' : 'online',
     hostId: host.id,
     rounds: 5,
     players: [host],
     events: [],
     seq: 0,
   };
-  GAMES[game].reset(room);
+  modOf(room).reset(room);
   saveRoom(room);
   markSeen(code, host.id);
   logRoom(room, '방 만듦');
@@ -225,7 +234,7 @@ function createRoom(req) {
 function lookupRoom(code) {
   const room = loadRoom(code);
   if (!room) fail('그런 방이 없어요. 코드를 확인해 주세요.');
-  return { ok: true, code, game: room.game, title: gameOf(room).title, status: room.status, count: room.players.length };
+  return { ok: true, code, game: room.game, mode: room.mode || 'online', title: gameOf(room).title, status: room.status, count: room.players.length };
 }
 
 function makePlayer(name, players) {
@@ -245,7 +254,7 @@ function joinRoom(code, req) {
     markSeen(code, again.id);
     return roomView(room, again.id);
   }
-  const g = gameOf(room);
+  const g = modOf(room);
   if (room.status !== 'lobby') fail('이미 게임이 시작된 방이에요.');
   if (room.players.length >= g.maxPlayers) fail('방이 가득 찼어요 (최대 ' + g.maxPlayers + '명).');
   const p = makePlayer(req.name, room.players);
@@ -264,8 +273,8 @@ function leaveRoom(room, me) {
     me.left = true;
     me.bot = true;
     me.difficulty = 'normal';
-    me.name = me.name.slice(0, 6) + '(봇)';
-    const g = gameOf(room);
+    me.name = me.name.slice(0, 6) + (room.mode === 'offline' ? '(나감)' : '(봇)');
+    const g = modOf(room);
     if (g.onLeave) g.onLeave(room, me);
   }
   const humans = room.players.filter((p) => !p.bot);
@@ -278,7 +287,8 @@ function leaveRoom(room, me) {
 }
 
 function addBot(room, difficulty) {
-  const g = gameOf(room);
+  if (room.mode === 'offline') fail('오프라인 테이블 모드는 봇 없이 사람끼리 모여서 해요.');
+  const g = modOf(room);
   if (room.status !== 'lobby') fail('대기방에서만 봇을 넣을 수 있어요.');
   if (room.players.length >= g.maxPlayers) fail('방이 가득 찼어요 (최대 ' + g.maxPlayers + '명).');
   const cast = g.bots || DEFAULT_BOTS;
@@ -302,8 +312,8 @@ function isAway(room, p, seenMap) {
 }
 
 function needsAutoMove(room, seenMap) {
-  if (room.status !== 'playing') return false;
-  const g = gameOf(room);
+  if (room.status !== 'playing' || room.mode === 'offline') return false;
+  const g = modOf(room);
   const seat = g.actor(room);
   const p = room.players[seat];
   if (!p || (!p.bot && !isAway(room, p, seenMap))) return false;
@@ -320,7 +330,7 @@ function pollRoom(code, req) {
     room = withLock(() => {
       const r = loadRoom(code);
       if (r && needsAutoMove(r, seenMapFor(r))) {
-        const g = gameOf(r);
+        const g = modOf(r);
         g.botMove(r, g.actor(r));
         r.lastActionAt = Date.now();
         if (r.status === 'finished' && r.resultText) logRoom(r, '게임 끝', r.resultText);
@@ -335,8 +345,16 @@ function pollRoom(code, req) {
 }
 
 /** 각 참가자에게 보내는 화면용 상태 — 숨김 정보는 게임 모듈의 view가 걸러 냄 */
+/** 📺 테이블 화면: 참가하지 않고 공용 판만 보기 (숨김 정보 없음) */
+function watchRoom(code, req) {
+  const room = loadRoom(code);
+  if (!room) return { ok: false, gone: true, error: '방이 사라졌어요.' };
+  if (Number(req.since) === room.version) return { ok: true, same: true, version: room.version };
+  return roomView(room, null);
+}
+
 function roomView(room, pid) {
-  const g = gameOf(room);
+  const g = modOf(room);
   const seen = seenMapFor(room);
   const mySeat = room.players.findIndex((p) => p.id === pid);
   const base = {
@@ -348,6 +366,8 @@ function roomView(room, pid) {
     minPlayers: g.minPlayers,
     maxPlayers: g.maxPlayers,
     status: room.status,
+    mode: room.mode || 'online',
+    hasOffline: !!gameOf(room).offline,
     hostId: room.hostId,
     rounds: room.rounds,
     me: pid,
@@ -362,6 +382,381 @@ function roomView(room, pid) {
     seq: room.seq,
   };
   return Object.assign(base, g.view(room, mySeat));
+}
+
+// ==================== server/offline-table.js ====================
+// ===== 공용 오프라인 테이블 모드 =====
+// 패드·폰은 있는데 실물 카드가 없을 때: 서버는 섞기, 나눠주기, 비공개 패, 공용 영역만 관리.
+// 규칙 판정·힌트·봇·승패 판정은 하지 않고, 모든 동작을 로그로 모두에게 공개함.
+//
+// 게임 모듈은 offline: { … } 으로 '구성품 정의'만 넘김:
+//   deck(n) → ['카드코드', …]           전체 카드 (엔진이 섞음)
+//   deal(n) → 한 사람당 처음 나눠줄 장수
+//   zones: [{ id, name, kind: 'pile' | 'rows', perSeat? }]
+//        pile: 낼 때마다 한 묶음씩 쌓임(맨 위 묶음이 크게 보임) / rows: 줄을 자유롭게 만들고 고침
+//   name(code) → 로그에 쓸 이름 ('빨강 7')
+//   back(code)? → 남들에게 보이는 뒷면 정보 ('b' 검정 타일 등). 기본 ''
+//   sort(a, b)? → 패 자동 정렬 비교 함수 (코드끼리)
+//   secret(n)? → 한 사람에 1장씩 비밀로 받는 카드 (역할 카드)
+//   blind? → 내 패도 못 봄 (뒤집어 쌓아 둔 더미)
+//   hideOrder? → 내 패 구성은 보이지만 자리는 모름 (남이 자리로 고름)
+//   pickPassesTurn? → 남의 카드를 뒤집으면 그 사람 차례로
+//   setup(ot, n)? → 처음 판 꾸미기 (버린 더미에 1장 뒤집기 등)
+//   actions: 화면에 보일 동작 목록 (클라이언트 참고용)
+//   minPlayers?, maxPlayers?
+
+const OT_UNDO = 6;
+
+function otShuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i];
+    a[i] = a[j];
+    a[j] = t;
+  }
+  return a;
+}
+
+function offlineModule(g) {
+  const cfg = g.offline;
+  const zoneDefs = cfg.zones || [];
+  const nameOf = (c) => (cfg.name ? cfg.name(c.f) : c.f);
+  const backOf = (f) => (cfg.back ? cfg.back(f) : '');
+  const sortHand = (h) => {
+    if (cfg.sort && !cfg.hideOrder) h.sort((a, b) => cfg.sort(a.f, b.f));
+  };
+  const zoneDef = (zid) => zoneDefs.find((z) => z.id === String(zid).split(':')[0]);
+  const zoneTitle = (room, zid) => {
+    const d = zoneDef(zid);
+    const seat = String(zid).split(':')[1];
+    return (d ? d.name : zid) + (seat != null && room.players[seat] ? '(' + room.players[seat].name + ')' : '');
+  };
+  const listNames = (cards) => {
+    const names = cards.map(nameOf);
+    return names.length > 4 ? names.slice(0, 4).join(', ') + ' 외 ' + (names.length - 4) + '장' : names.join(', ');
+  };
+
+  function newTable(n) {
+    const codes = otShuffle(cfg.deck(n).slice());
+    let uid = 1;
+    const ot = { draw: [], hands: [], secrets: [], zones: {}, turn: 0, round: 1, undo: [], lastBy: -1, winner: null };
+    ot.draw = codes.map((f) => ({ id: uid++, f, up: false }));
+    zoneDefs.forEach((z) => {
+      if (z.perSeat) for (let i = 0; i < n; i++) ot.zones[z.id + ':' + i] = [];
+      else ot.zones[z.id] = [];
+    });
+    const per = typeof cfg.deal === 'function' ? cfg.deal(n) : cfg.deal || 0;
+    for (let i = 0; i < n; i++) {
+      ot.hands.push(ot.draw.splice(0, per));
+      sortHand(ot.hands[i]);
+    }
+    if (cfg.secret) ot.secrets = otShuffle(cfg.secret(n).slice()).map((f) => ({ id: uid++, f, up: false }));
+    ot.uid = uid;
+    if (cfg.setup) cfg.setup(ot, n);
+    return ot;
+  }
+
+  function log(room, seat, text) {
+    pushEvent(room, { type: 'ot', seat, text: (seat >= 0 ? room.players[seat].name + ': ' : '') + text });
+  }
+
+  /** 카드 id로 위치 찾기: 내 패 또는 테이블 영역 */
+  function takeFrom(ot, seat, ids, allowHand, allowZones) {
+    const want = ids.map(Number);
+    const got = [];
+    want.forEach((id) => {
+      let card = null;
+      if (allowHand) {
+        const h = ot.hands[seat];
+        const i = h.findIndex((c) => c.id === id);
+        if (i >= 0) card = h.splice(i, 1)[0];
+      }
+      if (!card && allowZones) {
+        Object.keys(ot.zones).some((zid) =>
+          ot.zones[zid].some((row, r) => {
+            const i = row.findIndex((c) => c.id === id);
+            if (i < 0) return false;
+            card = row.splice(i, 1)[0];
+            if (!row.length) ot.zones[zid].splice(r, 1);
+            return true;
+          }),
+        );
+      }
+      if (!card) fail('그 카드를 찾을 수 없어요. 화면이 바뀌었을 수 있어요.');
+      got.push(card);
+    });
+    return got;
+  }
+
+  function putTo(room, ot, zid, row, cards) {
+    if (!ot.zones[zid]) fail('그런 자리가 없어요.');
+    const rows = ot.zones[zid];
+    const d = zoneDef(zid);
+    cards.forEach((c) => (c.up = true));
+    const r = Number(row);
+    if (d && d.kind === 'rows' && Number.isInteger(r) && r >= 0 && r < rows.length) {
+      rows[r] = rows[r].concat(cards);
+      if (cfg.sortRow) rows[r].sort((a, b) => cfg.sortRow(a.f, b.f));
+    } else rows.push(cards);
+  }
+
+  function snapshot(ot) {
+    const copy = JSON.parse(JSON.stringify(ot));
+    delete copy.undo;
+    ot.undo.push(copy);
+    while (ot.undo.length > OT_UNDO) ot.undo.shift();
+  }
+
+  function seatArg(room, v) {
+    const s = Number(v);
+    if (!Number.isInteger(s) || s < 0 || s >= room.players.length) fail('누구인지 알 수 없어요.');
+    return s;
+  }
+
+  return {
+    title: g.title,
+    minPlayers: cfg.minPlayers || g.minPlayers,
+    maxPlayers: cfg.maxPlayers || g.maxPlayers,
+    reset(room) {
+      room.ot = null;
+      g.reset(room);
+    },
+    start(room) {
+      room.ot = newTable(room.players.length);
+      room.status = 'playing';
+      log(room, -1, '카드를 섞어 나눠 줬어요. 규칙은 직접 말로 지켜 주세요!');
+    },
+    act(room, seat, req, isHost) {
+      const ot = room.ot;
+      if (!ot) fail('아직 시작하지 않았어요.');
+      const a = req.action;
+      const hostOnly = () => isHost || fail('방장만 할 수 있어요.');
+      if (room.status === 'finished' && a !== 'ot_reshuffle') fail('끝난 판이에요. 방장이 다시 섞을 수 있어요.');
+      if (a === 'ot_undo') {
+        if (!isHost && ot.lastBy !== seat) fail('되돌리기는 방장이나 방금 움직인 사람만 할 수 있어요.');
+        const prev = ot.undo.pop();
+        if (!prev) fail('더 되돌릴 수 없어요.');
+        prev.undo = ot.undo;
+        room.ot = prev;
+        room.ot.lastBy = -1;
+        log(room, seat, '↩️ 방금 동작을 되돌렸어요');
+        return;
+      }
+      if (a !== 'ot_reshuffle' && a !== 'ot_end') snapshot(ot);
+      ot.lastBy = seat;
+      switch (a) {
+        case 'ot_play': {
+          if (cfg.blind) fail('이 게임은 맨 위 카드 뒤집기로 내요.');
+          const cards = takeFrom(ot, seat, req.ids || [], true, false);
+          if (!cards.length) fail('낼 카드를 고르세요.');
+          putTo(room, ot, String(req.zone), req.row, cards);
+          log(room, seat, listNames(cards) + ' → ' + zoneTitle(room, req.zone));
+          break;
+        }
+        case 'ot_move': {
+          const cards = takeFrom(ot, seat, req.ids || [], true, true);
+          if (!cards.length) fail('옮길 카드를 고르세요.');
+          putTo(room, ot, String(req.zone), req.row, cards);
+          log(room, seat, listNames(cards) + ' 옮김 → ' + zoneTitle(room, req.zone));
+          break;
+        }
+        case 'ot_take': {
+          const cards = takeFrom(ot, seat, req.ids || [], false, true);
+          cards.forEach((c) => (c.up = false));
+          ot.hands[seat] = ot.hands[seat].concat(cards);
+          sortHand(ot.hands[seat]);
+          log(room, seat, listNames(cards) + ' 가져감');
+          break;
+        }
+        case 'ot_draw': {
+          const n = Math.max(1, Math.min(10, Number(req.n) || 1));
+          const back = req.back == null ? null : String(req.back);
+          const got = [];
+          for (let k = 0; k < n; k++) {
+            const i = back == null ? 0 : ot.draw.findIndex((c) => backOf(c.f) === back);
+            if (i < 0 || !ot.draw.length) break;
+            got.push(ot.draw.splice(i, 1)[0]);
+          }
+          if (!got.length) fail('뽑을 카드가 없어요.');
+          ot.hands[seat] = ot.hands[seat].concat(got);
+          sortHand(ot.hands[seat]);
+          log(room, seat, '카드 ' + got.length + '장 뽑음' + (back ? ' (' + (cfg.backName ? cfg.backName(back) : back) + ')' : ''));
+          break;
+        }
+        case 'ot_reveal': {
+          const c = ot.hands[seat].find((x) => x.id === Number(req.id));
+          if (!c) fail('내 카드가 아니에요.');
+          c.up = !!req.up;
+          log(room, seat, (c.up ? '🔓 공개: ' : '🔒 다시 숨김: ') + (c.up ? nameOf(c) : '카드 1장'));
+          break;
+        }
+        case 'ot_order': {
+          const ids = (req.ids || []).map(Number);
+          const h = ot.hands[seat];
+          if (ids.length !== h.length) fail('순서를 바꿀 수 없어요.');
+          const next = ids.map((id) => h.find((c) => c.id === id));
+          if (next.some((c) => !c)) fail('순서를 바꿀 수 없어요.');
+          ot.hands[seat] = next;
+          log(room, seat, '패 순서를 바꿈');
+          break;
+        }
+        case 'ot_give': {
+          const to = seatArg(room, req.to);
+          if (to === seat) fail('다른 사람을 고르세요.');
+          const h = ot.hands[seat];
+          let card;
+          if (req.top || cfg.blind) card = h.shift();
+          else {
+            const i = h.findIndex((c) => c.id === Number(req.id));
+            if (i >= 0) card = h.splice(i, 1)[0];
+          }
+          if (!card) fail('줄 카드가 없어요.');
+          card.up = false;
+          ot.hands[to].push(card);
+          sortHand(ot.hands[to]);
+          log(room, seat, room.players[to].name + '에게 카드 1장 줌');
+          break;
+        }
+        case 'ot_pick': {
+          const t = seatArg(room, req.target);
+          if (t === seat) fail('다른 사람의 카드를 고르세요.');
+          const h = ot.hands[t];
+          const i = Number(req.index);
+          if (!Number.isInteger(i) || i < 0 || i >= h.length) fail('그 자리에 카드가 없어요.');
+          const card = h.splice(i, 1)[0];
+          const zid = String(req.zone || (zoneDefs[0] && zoneDefs[0].id));
+          putTo(room, ot, zid, -1, [card]);
+          if (cfg.pickPassesTurn) ot.turn = t;
+          log(room, seat, room.players[t].name + '의 카드를 뒤집음 → ' + nameOf(card));
+          break;
+        }
+        case 'ot_flipTop': {
+          const card = ot.hands[seat].shift();
+          if (!card) fail('뒤집을 카드가 없어요.');
+          const def = zoneDefs[0];
+          const zid = req.zone ? String(req.zone) : def.perSeat ? def.id + ':' + seat : def.id;
+          putTo(room, ot, zid, -1, [card]);
+          if (cfg.flipPassesTurn) ot.turn = nextSeat(room, seat);
+          log(room, seat, '뒤집음 → ' + nameOf(card));
+          break;
+        }
+        case 'ot_collect': {
+          const to = seatArg(room, req.to);
+          let got = [];
+          Object.keys(ot.zones).forEach((zid) => {
+            if (req.zone && zid.split(':')[0] !== String(req.zone)) return;
+            ot.zones[zid].forEach((row) => (got = got.concat(row)));
+            ot.zones[zid] = [];
+          });
+          if (!got.length) fail('가져갈 카드가 없어요.');
+          got.forEach((c) => (c.up = false));
+          ot.hands[to] = ot.hands[to].concat(got);
+          sortHand(ot.hands[to]);
+          log(room, seat, '테이블 카드 ' + got.length + '장 → ' + room.players[to].name);
+          break;
+        }
+        case 'ot_recycle': {
+          const zid = String(req.zone || zoneDefs[0].id);
+          const rows = ot.zones[zid] || fail('그런 자리가 없어요.');
+          if (rows.length < 2) fail('다시 섞을 카드가 부족해요.');
+          const keep = rows.pop();
+          let back = [];
+          rows.forEach((r) => (back = back.concat(r)));
+          back.forEach((c) => (c.up = false));
+          ot.zones[zid] = [keep];
+          ot.draw = otShuffle(ot.draw.concat(back));
+          log(room, seat, zoneTitle(room, zid) + ' 아래 카드 ' + back.length + '장을 섞어 뽑을 더미로');
+          break;
+        }
+        case 'ot_redeal': {
+          hostOnly();
+          const per = Math.max(1, Math.min(20, Number(req.count) || 1));
+          let all = [];
+          ot.hands.forEach((h) => (all = all.concat(h)));
+          otShuffle(all);
+          if (all.length < per * room.players.length) fail('카드가 모자라요. 장수를 줄여 주세요.');
+          ot.hands = room.players.map(() => all.splice(0, per));
+          ot.hands.forEach((h) => sortHand(h));
+          ot.round++;
+          log(room, seat, '🔄 ' + ot.round + '라운드: 모은 카드를 섞어 ' + per + '장씩 다시 나눔');
+          break;
+        }
+        case 'ot_turn': {
+          ot.turn = req.to != null ? seatArg(room, req.to) : nextSeat(room, ot.turn);
+          log(room, seat, '➡️ ' + room.players[ot.turn].name + ' 차례');
+          break;
+        }
+        case 'ot_end': {
+          hostOnly();
+          const w = Number(req.winner);
+          ot.winner = Number.isInteger(w) && w >= 0 && w < room.players.length ? w : -1;
+          room.status = 'finished';
+          room.resultText = '오프라인 모드 · ' + (ot.winner >= 0 ? '승자: ' + room.players[ot.winner].name : '승자 없음');
+          log(room, seat, '🏁 게임 끝! ' + (ot.winner >= 0 ? room.players[ot.winner].name + ' 승리' : ''));
+          break;
+        }
+        case 'ot_reshuffle': {
+          hostOnly();
+          room.ot = newTable(room.players.length);
+          room.status = 'playing';
+          log(room, seat, '🔀 처음부터 다시 섞어 나눔');
+          break;
+        }
+        default:
+          fail('오프라인 모드에서 할 수 없는 동작이에요.');
+      }
+    },
+    actor() {
+      return -1; // 오프라인 모드는 봇·자리 비움 대신 두기 없음
+    },
+    botDelay() {
+      return 999999;
+    },
+    botMove() {},
+    playerView(room, p, i) {
+      const ot = room.ot;
+      if (!ot) return { count: 0 };
+      return { count: ot.hands[i].length };
+    },
+    view(room, mySeat) {
+      const ot = room.ot;
+      if (!ot) return { ot: null };
+      const finished = room.status === 'finished';
+      const pub = (c) => ({ id: c.id, b: backOf(c.f), f: c.up ? c.f : null, up: c.up });
+      let mine = [];
+      if (mySeat >= 0) {
+        const h = ot.hands[mySeat];
+        if (cfg.blind) mine = [];
+        else if (cfg.hideOrder) mine = h.map((c) => ({ f: c.f, up: c.up })).sort((a, b) => (cfg.sort ? cfg.sort(a.f, b.f) : a.f < b.f ? -1 : 1));
+        else mine = h.map((c) => ({ id: c.id, f: c.f, up: c.up, b: backOf(c.f) }));
+      }
+      const drawBacks = {};
+      if (cfg.back) ot.draw.forEach((c) => (drawBacks[backOf(c.f)] = (drawBacks[backOf(c.f)] || 0) + 1));
+      const zones = {};
+      Object.keys(ot.zones).forEach((zid) => (zones[zid] = ot.zones[zid].map((row) => row.map((c) => ({ id: c.id, f: c.f })))));
+      return {
+        ot: {
+          drawCount: ot.draw.length,
+          drawBacks,
+          zones,
+          hand: mine,
+          hands: ot.hands.map((h) => h.map(pub)),
+          secret: mySeat >= 0 && ot.secrets[mySeat] ? ot.secrets[mySeat].f : null,
+          secrets: finished && ot.secrets.length ? ot.secrets.map((c) => c.f) : null,
+          turn: ot.turn,
+          round: ot.round,
+          winner: ot.winner,
+          lastBy: ot.lastBy,
+          undoCount: ot.undo.length,
+        },
+      };
+    },
+    onLeave() {},
+  };
+}
+
+function nextSeat(room, s) {
+  return (s + 1) % room.players.length;
 }
 
 // ==================== TileRules (games/tile-battle/js/rules.js) ====================
@@ -1003,6 +1398,257 @@ function botChooseFlip({ me, role, counts, claims = {}, sus = {}, flipped = {}, 
 return { botClaims, botChooseFlip };
 })();
 
+// ==================== FDRules (games/flip-duel/js/rules.js) ====================
+const FDRules = (() => {
+// 흑백 뒤집기 대전 — 규칙 엔진 + minimax 봇 (브라우저와 앱스크립트 서버가 같이 씀)
+// 판: 길이 64 배열, 0 빈칸 · 1 흑 · 2 백. 흑이 먼저 둠.
+// 규칙: 상대 돌을 내 돌 두 개 사이에 (가로·세로·대각선) 끼우면 뒤집힘. 뒤집을 수 없는 곳엔 못 둠.
+//       둘 곳이 없으면 차례가 넘어가고, 둘 다 못 두면 끝 → 돌이 많은 쪽 승리.
+
+const N = 8;
+const BLACK = 1;
+const WHITE = 2;
+const COLOR_NAME = { 1: '흑', 2: '백' };
+const DIRS = [-9, -8, -7, -1, 1, 7, 8, 9];
+
+const other = (p) => 3 - p;
+
+function newBoard() {
+  const b = new Array(64).fill(0);
+  b[27] = WHITE;
+  b[36] = WHITE;
+  b[28] = BLACK;
+  b[35] = BLACK;
+  return b;
+}
+
+/** idx에 p가 두면 뒤집히는 칸들 */
+function flipsFor(b, p, idx) {
+  if (b[idx] !== 0) return [];
+  const out = [];
+  const r0 = Math.floor(idx / 8);
+  const c0 = idx % 8;
+  for (const d of DIRS) {
+    const dr = Math.sign(Math.round(d / 8));
+    const dc = d - dr * 8;
+    let r = r0 + dr;
+    let c = c0 + dc;
+    const line = [];
+    while (r >= 0 && r < 8 && c >= 0 && c < 8 && b[r * 8 + c] === other(p)) {
+      line.push(r * 8 + c);
+      r += dr;
+      c += dc;
+    }
+    if (line.length && r >= 0 && r < 8 && c >= 0 && c < 8 && b[r * 8 + c] === p) out.push(...line);
+  }
+  return out;
+}
+
+function legalMoves(b, p) {
+  const out = [];
+  for (let i = 0; i < 64; i++) if (b[i] === 0 && flipsFor(b, p, i).length) out.push(i);
+  return out;
+}
+
+function count(b) {
+  let x = 0;
+  let o = 0;
+  for (const v of b) {
+    if (v === BLACK) x++;
+    else if (v === WHITE) o++;
+  }
+  return { 1: x, 2: o };
+}
+
+/** 새 게임 상태 */
+function newGame() {
+  return { board: newBoard(), turn: BLACK, last: -1, flips: [], passed: false, over: false, winner: 0, moves: 0 };
+}
+
+/**
+ * 두기. 상태를 바꾸고 { flips, passed(다음 사람이 못 둬서 넘어감), over } 를 돌려줌
+ */
+function play(g, p, idx) {
+  if (g.over) throw new Error('이미 끝난 판이에요.');
+  if (p !== g.turn) throw new Error('지금은 상대 차례예요.');
+  const flips = flipsFor(g.board, p, idx);
+  if (!flips.length) throw new Error('거기는 둘 수 없어요. 상대 돌을 끼워야 해요.');
+  g.board[idx] = p;
+  for (const f of flips) g.board[f] = p;
+  g.last = idx;
+  g.flips = flips;
+  g.moves++;
+  const opp = other(p);
+  g.passed = false;
+  if (legalMoves(g.board, opp).length) g.turn = opp;
+  else if (legalMoves(g.board, p).length) {
+    g.turn = p; // 상대가 둘 곳이 없어 한 번 쉼
+    g.passed = true;
+  } else finish(g);
+  return { flips, passed: g.passed, over: g.over };
+}
+
+function finish(g) {
+  g.over = true;
+  const c = count(g.board);
+  g.winner = c[1] > c[2] ? BLACK : c[2] > c[1] ? WHITE : 0;
+}
+
+/** 지금 둘 사람이 둘 곳이 없는지 (첫 수 등에서 생길 일은 없지만 안전장치) */
+function ensureMovable(g) {
+  if (g.over) return;
+  if (!legalMoves(g.board, g.turn).length) {
+    if (legalMoves(g.board, other(g.turn)).length) {
+      g.turn = other(g.turn);
+      g.passed = true;
+    } else finish(g);
+  }
+}
+
+// ---------- 봇 ----------
+// 자리 가중치: 모서리는 최고, 모서리 옆(X·C 칸)은 위험
+const W = [
+  120, -25, 20, 5, 5, 20, -25, 120,
+  -25, -45, -4, -4, -4, -4, -45, -25,
+  20, -4, 15, 3, 3, 15, -4, 20,
+  5, -4, 3, 3, 3, 3, -4, 5,
+  5, -4, 3, 3, 3, 3, -4, 5,
+  20, -4, 15, 3, 3, 15, -4, 20,
+  -25, -45, -4, -4, -4, -4, -45, -25,
+  120, -25, 20, 5, 5, 20, -25, 120,
+];
+
+function evaluate(b, p) {
+  const o = other(p);
+  let pos = 0;
+  let mine = 0;
+  let theirs = 0;
+  for (let i = 0; i < 64; i++) {
+    if (b[i] === p) {
+      pos += W[i];
+      mine++;
+    } else if (b[i] === o) {
+      pos -= W[i];
+      theirs++;
+    }
+  }
+  const empties = 64 - mine - theirs;
+  const mob = legalMoves(b, p).length - legalMoves(b, o).length;
+  // 끝으로 갈수록 돌 개수가 중요
+  return pos + mob * 6 + (empties < 14 ? (mine - theirs) * (14 - empties) : 0);
+}
+
+function apply(b, p, idx) {
+  const nb = b.slice();
+  nb[idx] = p;
+  for (const f of flipsFor(b, p, idx)) nb[f] = p;
+  return nb;
+}
+
+function negamax(b, p, depth, alpha, beta, passed) {
+  const moves = legalMoves(b, p);
+  if (depth === 0) return evaluate(b, p);
+  if (!moves.length) {
+    if (passed) {
+      const c = count(b);
+      return (c[p] - c[other(p)]) * 1000;
+    }
+    return -negamax(b, other(p), depth - 1, -beta, -alpha, true);
+  }
+  // 좋은 자리부터 보면 가지치기가 잘 됨
+  moves.sort((x, y) => W[y] - W[x]);
+  let best = -Infinity;
+  for (const m of moves) {
+    const v = -negamax(apply(b, p, m), other(p), depth - 1, -beta, -alpha, false);
+    if (v > best) best = v;
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+
+const DEPTH = { easy: 1, normal: 3, hard: 5 };
+
+/** 봇이 둘 자리. easy는 가끔 실수, hard는 끝판에 끝까지 읽음 */
+function bestMove(b, p, difficulty = 'normal') {
+  const moves = legalMoves(b, p);
+  if (!moves.length) return -1;
+  if (difficulty === 'easy' && Math.random() < 0.35) return moves[Math.floor(Math.random() * moves.length)];
+  const empties = b.filter((v) => v === 0).length;
+  let depth = DEPTH[difficulty] || 3;
+  if (difficulty === 'hard' && empties <= 10) depth = empties;
+  let best = moves[0];
+  let bestV = -Infinity;
+  for (const m of moves.sort((x, y) => W[y] - W[x])) {
+    const v = -negamax(apply(b, p, m), other(p), depth - 1, -Infinity, Infinity, false) + (difficulty === 'easy' ? Math.random() * 30 : 0);
+    if (v > bestV) {
+      bestV = v;
+      best = m;
+    }
+  }
+  return best;
+}
+
+const cellName = (i) => 'ABCDEFGH'[i % 8] + (Math.floor(i / 8) + 1);
+
+// ---------- 자가 테스트 ----------
+function runSelfTests() {
+  const results = [];
+  const ok = (name, cond) => results.push({ name, pass: !!cond });
+  const g = newGame();
+  ok('첫 판 흑의 둘 곳 4개', legalMoves(g.board, BLACK).length === 4);
+  ok('D3(19)에 두면 1개 뒤집힘', flipsFor(g.board, BLACK, 19).length === 1);
+  ok('빈칸 아닌 곳은 못 둠', flipsFor(g.board, BLACK, 27).length === 0);
+  play(g, BLACK, 19);
+  const c = count(g.board);
+  ok('두고 나면 흑 4 백 1', c[1] === 4 && c[2] === 1);
+  ok('차례가 백으로', g.turn === WHITE);
+  let threw = false;
+  try {
+    play(g, WHITE, 0);
+  } catch {
+    threw = true;
+  }
+  ok('못 두는 곳은 오류', threw);
+  // 무작위 판 끝까지: 돌 개수는 늘 (두어진 수 + 4)
+  let bad = 0;
+  for (let k = 0; k < 300; k++) {
+    const t = newGame();
+    let guard = 0;
+    while (!t.over && guard++ < 70) {
+      const ms = legalMoves(t.board, t.turn);
+      const before = count(t.board);
+      play(t, t.turn, ms[Math.floor(Math.random() * ms.length)]);
+      const after = count(t.board);
+      if (after[1] + after[2] !== before[1] + before[2] + 1) bad++;
+    }
+    if (!t.over) bad++;
+  }
+  ok('무작위 300판 오류 없음', bad === 0);
+  // 봇은 모서리를 잡음
+  const b = new Array(64).fill(0);
+  b[9] = WHITE;
+  b[18] = BLACK;
+  b[1] = WHITE;
+  b[2] = BLACK;
+  ok('보통 봇은 모서리(A1)를 잡음', bestMove(b, BLACK, 'normal') === 0);
+  ok('봇은 늘 둘 수 있는 곳을 고름', (() => {
+    const t = newGame();
+    for (let k = 0; k < 20 && !t.over; k++) {
+      const m = bestMove(t.board, t.turn, ['easy', 'normal', 'hard'][k % 3]);
+      if (!legalMoves(t.board, t.turn).includes(m)) return false;
+      play(t, t.turn, m);
+    }
+    return true;
+  })());
+  const passed = results.filter((r) => r.pass).length;
+  if (typeof console !== 'undefined') console.table?.(results);
+  return { passed, total: results.length, results };
+}
+
+return { N, BLACK, WHITE, COLOR_NAME, other, newBoard, flipsFor, legalMoves, count, newGame, play, finish, ensureMovable, DEPTH, bestMove, cellName, runSelfTests };
+})();
+
 // ==================== server/games/tile-battle.js ====================
 // ===== 게임 모듈: 시험 끝! 타일 배틀 =====
 // TileRules(games/tile-battle/js/rules.js), TileAI(…/ai.js)는 build-gs.mjs가 이름공간으로 감싸 넣어 줌
@@ -1311,5 +1957,88 @@ function dsFlip(room, seat, target, index) {
     pushEvent(room, { type: 'end', winner: g.winner, reason: g.reason, roles: g.roles, hiddenRole: g.hiddenRole });
   } else if (res.roundEnded) {
     dsNewRound(room);
+  }
+}
+
+// ==================== server/games/flip-duel.js ====================
+// ===== 게임 모듈: 흑백 뒤집기 대전 (2인) =====
+// FDRules(games/flip-duel/js/rules.js)는 build-gs.mjs가 이름공간으로 감싸 넣어 줌
+// 숨긴 정보가 없어서 오프라인 테이블 모드 대신 '한 기기 2인 대전'(브라우저 안 서버)을 씀
+
+registerGame('flip-duel', {
+  title: '흑백 뒤집기 대전',
+  minPlayers: 2,
+  maxPlayers: 2,
+  bots: [
+    { name: '판다 봇', emoji: '🐼' },
+    { name: '펭귄 봇', emoji: '🐧' },
+  ],
+
+  reset(room) {
+    room.fd = null;
+  },
+
+  start(room) {
+    room.fd = FDRules.newGame();
+    room.status = 'playing';
+    pushEvent(room, { type: 'start' });
+  },
+
+  act(room, seat, req) {
+    if (room.status !== 'playing') fail('지금은 둘 수 없어요.');
+    if (req.action !== 'place') fail('알 수 없는 요청이에요.');
+    fdPlace(room, seat, Number(req.idx));
+  },
+
+  actor(room) {
+    return room.status === 'playing' && room.fd ? room.fd.turn - 1 : -1;
+  },
+  botDelay() {
+    return 900;
+  },
+  botMove(room, seat) {
+    const p = room.players[seat];
+    const idx = FDRules.bestMove(room.fd.board, seat + 1, p.bot ? p.difficulty : 'easy');
+    fdPlace(room, seat, idx);
+  },
+
+  playerView(room, p, i) {
+    const c = room.fd ? FDRules.count(room.fd.board) : { 1: 2, 2: 2 };
+    return { color: i + 1, discs: c[i + 1] };
+  },
+
+  view(room) {
+    const g = room.fd;
+    if (!g) return { fd: null };
+    return {
+      fd: {
+        board: g.board,
+        turn: g.turn,
+        last: g.last,
+        flips: g.flips,
+        passed: g.passed,
+        over: g.over,
+        winner: g.winner,
+        moves: g.moves,
+        legal: g.over ? [] : FDRules.legalMoves(g.board, g.turn),
+      },
+    };
+  },
+});
+
+function fdPlace(room, seat, idx) {
+  const g = room.fd;
+  let res;
+  try {
+    res = FDRules.play(g, seat + 1, idx);
+  } catch (e) {
+    fail(e.message);
+  }
+  pushEvent(room, { type: 'place', seat, idx, flips: res.flips, passed: res.passed });
+  if (res.over) {
+    room.status = 'finished';
+    const c = FDRules.count(g.board);
+    room.resultText = '흑 ' + c[1] + ' : 백 ' + c[2] + (g.winner ? ' / 승리: ' + room.players[g.winner - 1].name : ' / 무승부');
+    pushEvent(room, { type: 'end', winner: g.winner });
   }
 }
