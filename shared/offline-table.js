@@ -3,6 +3,29 @@
 // 3D 테이블은 뒤에서 분위기만 내고, 카드 조작은 휴대폰에서도 편한 HTML로 함.
 import { $, esc, toast, modal, banner, confetti } from './ui-core.js';
 
+// 스타일은 이 모듈을 불러오는 순간 한 번 붙임 (게임마다 CSS 구성이 달라도 똑같이 보이게)
+if (typeof document !== 'undefined' && !document.getElementById('ot-css')) {
+  const link = document.createElement('link');
+  link.id = 'ot-css';
+  link.rel = 'stylesheet';
+  link.href = new URL('./offline-table.css', import.meta.url).href;
+  document.head.appendChild(link);
+}
+
+/** 공용 HUD가 없는 예전 게임(타일 배틀, 심해 보물섬)용: 위쪽 바가 달린 전체 화면 칸을 만듦 */
+export function createOfflineRoot(title, onMenu) {
+  removeOfflineRoot();
+  document.body.insertAdjacentHTML(
+    'beforeend',
+    `<div id="ot-root" class="ot-root"><div class="ot-bar"><button class="icon-btn" id="ot-menu" aria-label="메뉴">☰</button><span>${esc(title)}</span></div><div id="ot-body"></div></div>`,
+  );
+  $('#ot-menu').addEventListener('click', onMenu);
+  return $('#ot-body');
+}
+export function removeOfflineRoot() {
+  document.getElementById('ot-root')?.remove();
+}
+
 /**
  * cfg:
  *   zones: [{ id, name, kind: 'pile'|'rows', perSeat? }]   (서버 offline.zones와 같게)
@@ -56,11 +79,12 @@ export class OfflineTable {
   }
 
   async send(action, payload = {}) {
+    const keep = { sel: this.sel, target: this.target };
+    this.sel = { src: null, ids: [] };
+    this.target = null;
     const ok = await this.lobby.send(action, payload);
-    if (ok) {
-      this.sel = { src: null, ids: [] };
-      this.target = null;
-    }
+    if (!ok) Object.assign(this, keep);
+    if (this.state) this.render(this.state);
     return ok;
   }
 
@@ -154,6 +178,10 @@ export class OfflineTable {
                 `<div class="ot-row" data-row="${zid}:${r}">${row.map((c) => this.cardHtml(c, { sel: this.isSel('zone', c.id), data: `data-zcard="${c.id}"` })).join('')}<span class="ot-row-drop">＋여기</span></div>`,
             )
             .join('') + `<button class="ot-row new" data-row="${zid}:-1">＋ 새 줄 만들기</button>`;
+        } else if (z.spread) {
+          // 뒤집힌 카드를 모두 펼쳐 보여 주기 (심해 보물섬 탐험대)
+          const all = rows.flat();
+          body = `<div class="ot-pile spread">${all.length ? all.map((c) => this.cardHtml(c, { small: all.length > 12, data: 'disabled' })).join('') : '<span class="ot-empty">아직 없어요</span>'}</div>`;
         } else {
           const top = rows[rows.length - 1] || [];
           const under = rows.length > 1 ? `<span class="ot-under">아래 ${count - top.length}장</span>` : '';
@@ -198,7 +226,8 @@ export class OfflineTable {
     const b = [];
     const n = this.sel.ids.length;
     if (a.flipTop) b.push(btn('flipTop', '🃏 맨 위 카드 뒤집기', ' primary'));
-    if (a.pick) b.push(btn('pick', this.target ? '🔍 고른 카드 뒤집기' : '남의 카드를 고르세요', this.target ? ' primary' : ' is-off'));
+    if (a.pick && ot.turn === this.me) b.push(btn('pick', this.target ? '🔍 고른 카드 뒤집기' : '🔑 내 차례! 남의 카드를 고르세요', this.target ? ' primary' : ' is-off'));
+    else if (a.pick) b.push(`<span class="ot-hint">🔑 ${esc(s.players[ot.turn]?.name || '')}님이 카드를 고르는 중</span>`);
     if (this.sel.src === 'hand' && n) {
       for (const z of this.cfg.zones) if (z.kind === 'pile' && !z.perSeat && a.play) b.push(btn(`play:${z.id}`, `▶ ${z.name}에 내기 (${n})`, ' primary'));
       if (this.cfg.zones.some((z) => z.kind === 'rows')) b.push(`<span class="ot-hint">↑ 판의 줄이나 ‘새 줄’을 눌러 내려놓기</span>`);

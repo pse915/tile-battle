@@ -3,6 +3,7 @@
 import { api, onlineReady } from './net.js';
 import { $, esc, showScreen, toast } from './ui-core.js';
 import { common } from './storage.js';
+import './offline-table.js'; // 방 모드 고르기·오프라인 화면 스타일
 
 const POLL_GAME_MS = 1300;
 const POLL_LOBBY_MS = 2000;

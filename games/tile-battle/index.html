@@ -117,6 +117,13 @@
         </div>
       </div>
       <div class="or-line"><span>또는</span></div>
+      <fieldset class="field mode-pick">
+        <legend>새 방 모드</legend>
+        <div class="seg">
+          <label><input type="radio" name="room-mode" value="online" checked /><span>🌐 온라인 모드<small>규칙 자동 판정 · 봇 가능</small></span></label>
+          <label><input type="radio" name="room-mode" value="offline" /><span>🪑 오프라인 테이블<small>패만 공유 · 판정은 말로</small></span></label>
+        </div>
+      </fieldset>
       <button type="button" class="btn big" id="btn-create-room">🏠 새 방 만들기 <small>코드를 친구에게 알려 주세요</small></button>
       <div class="sheet-actions">
         <button type="button" class="btn" data-go="menu">뒤로</button>
@@ -128,15 +135,17 @@
   <section id="screen-lobby" class="screen" aria-label="대기방">
     <div class="sheet lobby-sheet">
       <header class="sheet-head">대기방 <span class="lobby-count" id="lobby-count"></span></header>
+      <p class="mode-tag" id="lobby-mode"></p>
       <p class="lobby-label">방 코드</p>
       <div class="room-code" id="lobby-code" aria-live="polite"></div>
       <div class="share-row">
         <button class="btn small" id="btn-copy-code">코드 복사</button>
         <button class="btn small" id="btn-copy-link">초대 링크 복사</button>
+        <button class="btn small" id="btn-copy-table" hidden>📺 테이블 화면 링크</button>
       </div>
       <ul class="lobby-players" id="lobby-players"></ul>
       <div id="lobby-host">
-        <div class="field">
+        <div class="field" id="lobby-bots">
           <label>봇 넣기</label>
           <div class="bot-row">
             <button class="btn small" data-bot="easy">🤖 쉬움</button>

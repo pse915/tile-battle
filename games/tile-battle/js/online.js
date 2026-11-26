@@ -5,6 +5,23 @@ import { wait } from '../../../shared/anim.js';
 import { audio } from './audio.js';
 import { api } from '../../../shared/net.js';
 import * as ui from './ui.js';
+import { tileImage, tileBackImage } from './tiles.js';
+import { tileLabel } from './rules.js';
+import { OfflineTable, createOfflineRoot, removeOfflineRoot } from '../../../shared/offline-table.js';
+
+/** 🪑 오프라인 테이블 모드 화면 설정 (서버 구성품: server/games/tile-battle.js의 offline) */
+const tileOf = (code) => {
+  const [n, s] = code.split('-').map(Number);
+  return { id: code, n, s };
+};
+const OFFLINE_CFG = {
+  zones: [{ id: 'center', name: '가운데', kind: 'pile' }],
+  actions: { play: true, take: true },
+  cardImg: (code) => tileImage(tileOf(code)),
+  backImg: () => tileBackImage(),
+  cardRatio: 1.43,
+  tips: '족보는 말로 확인! 가운데보다 센 조합을 내고, 못 내면 ‘턴 넘기기’(패스). 점수 계산은 끝나고 함께',
+};
 
 const POLL_GAME_MS = 1300;
 const POLL_LOBBY_MS = 2000;
@@ -37,7 +54,22 @@ export class Online {
 
   // ---------- 방 만들기 / 참여 / 나가기 ----------
   async create(name) {
-    this.begin(await api('create', { name }));
+    const mode = document.querySelector('input[name="room-mode"]:checked')?.value || 'online';
+    this.begin(await api('create', { name, mode }));
+  }
+
+  /** 📺 테이블 화면: 참가하지 않고 공용 판만 보기 (오프라인 테이블 모드 방) */
+  async watch(code) {
+    const s = await api('watch', { code, since: -1 });
+    this.spectator = true;
+    this.active = true;
+    this.code = code;
+    this.pid = null;
+    this.version = -1;
+    this.inGame = false;
+    this.fails = 0;
+    this.apply(s);
+    this.schedulePoll();
   }
 
   async join(code, name) {
@@ -52,6 +84,7 @@ export class Online {
     this.inGame = false;
     this.queue = [];
     this.fails = 0;
+    this.spectator = false;
     rememberPid(s.code, s.me);
     this.apply(s);
     this.schedulePoll();
@@ -62,7 +95,7 @@ export class Online {
     if (!this.active) return;
     this.active = false;
     clearTimeout(this.timer);
-    api('leave', { code: this.code, pid: this.pid }).catch(() => {});
+    if (!this.spectator) api('leave', { code: this.code, pid: this.pid }).catch(() => {});
     try {
       sessionStorage.removeItem(`tilebattle:room:${this.code}`);
     } catch {
@@ -79,14 +112,16 @@ export class Online {
   schedulePoll() {
     clearTimeout(this.timer);
     if (!this.active) return;
-    const ms = this.state?.status === 'lobby' ? POLL_LOBBY_MS : POLL_GAME_MS;
+    let ms = this.state?.status === 'lobby' ? POLL_LOBBY_MS : POLL_GAME_MS;
+    if (this.state?.mode === 'offline') ms = Math.min(3500, ms + (this.idle || 0) * 400); // 변화가 없으면 천천히
     this.timer = setTimeout(() => this.poll(), ms);
   }
 
   async poll() {
     if (!this.active) return;
     try {
-      const s = await api('poll', { code: this.code, pid: this.pid, since: this.version });
+      const s = this.spectator ? await api('watch', { code: this.code, since: this.version }) : await api('poll', { code: this.code, pid: this.pid, since: this.version });
+      this.idle = s.same ? (this.idle || 0) + 1 : 0;
       this.fails = 0;
       this.apply(s);
     } catch (err) {
@@ -117,11 +152,41 @@ export class Online {
     }
   }
 
+  /** 오프라인 테이블 화면용: 성공하면 true */
+  async sendOk(action, payload = {}) {
+    try {
+      const s = await api(action, { code: this.code, pid: this.pid, ...payload });
+      this.idle = 0;
+      if (!s.left) this.apply(s);
+      return true;
+    } catch (err) {
+      audio.error();
+      ui.toast(err.message, 2400);
+      return false;
+    }
+  }
+
   // ---------- 상태 반영 ----------
   apply(s) {
     if (!this.active || s.same || s.version <= this.version) return;
     this.version = s.version;
     this.state = s;
+    if (this.spectator && s.mode !== 'offline') {
+      ui.toast('📺 테이블 화면은 오프라인 테이블 모드 방에서만 쓸 수 있어요.', 3000);
+      this.active = false;
+      return this.onExit();
+    }
+    if (s.mode === 'offline' && (s.status !== 'lobby' || this.spectator)) {
+      if (!this.ot) {
+        this.inGame = true;
+        ui.showScreen(null);
+        this.stage.setTitleMode(true);
+        const root = createOfflineRoot('시험 끝! 타일 배틀 · 🪑 오프라인 테이블', () => this.onExit());
+        this.ot = new OfflineTable({ root, lobby: { send: (a, p) => this.sendOk(a, p) }, cfg: OFFLINE_CFG, audio });
+      }
+      this.ot.render(s);
+      return;
+    }
     if (s.status === 'lobby') {
       if (this.inGame) this.exitGameView();
       this.lastSeq = s.seq;
@@ -165,6 +230,11 @@ export class Online {
       .join('') +
       Array.from({ length: 5 - s.players.length }, () => '<li class="empty"><span class="avatar">·</span><span class="pname">빈자리</span></li>').join('');
     const n = s.players.length;
+    const offline = s.mode === 'offline';
+    ui.$('#lobby-mode').textContent = offline ? '🪑 오프라인 테이블 모드 · 패만 공유하고 판정은 얼굴 보며 말로!' : '🌐 온라인 모드 · 규칙은 자동으로 판정해요';
+    ui.$('#lobby-mode').classList.toggle('offline', offline);
+    ui.$('#btn-copy-table').hidden = !offline;
+    ui.$('#lobby-bots').hidden = offline;
     ui.$('#lobby-host').hidden = !host;
     ui.$('#lobby-guest').hidden = host;
     ui.$('#lobby-guest-rounds').textContent = `${s.rounds}판`;
@@ -217,6 +287,13 @@ export class Online {
   }
 
   exitGameView() {
+    if (this.ot) {
+      this.ot = null;
+      this.inGame = false;
+      removeOfflineRoot();
+      ui.closeModal();
+      return;
+    }
     this.inGame = false;
     this.queue = [];
     this.unsubFrame?.();

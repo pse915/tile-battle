@@ -289,6 +289,7 @@ function offlineModule(g) {
           otShuffle(all);
           if (all.length < per * room.players.length) fail('카드가 모자라요. 장수를 줄여 주세요.');
           ot.hands = room.players.map(() => all.splice(0, per));
+          ot.draw = ot.draw.concat(all); // 남는 카드는 뽑을 더미로 (사라지지 않게)
           ot.hands.forEach((h) => sortHand(h));
           ot.round++;
           log(room, seat, '🔄 ' + ot.round + '라운드: 모은 카드를 섞어 ' + per + '장씩 다시 나눔');
