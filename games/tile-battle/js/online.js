@@ -1,9 +1,9 @@
 // 온라인 대기방과 온라인 대전 화면 — 서버(앱스크립트)가 규칙을 판정하고, 여기서는 보여 주기만 함
 import { checkPlay, sortTiles } from './rules.js';
 import { hintMove } from './ai.js';
-import { wait } from './anim.js';
+import { wait } from '../../../shared/anim.js';
 import { audio } from './audio.js';
-import { api } from './net.js';
+import { api } from '../../../shared/net.js';
 import * as ui from './ui.js';
 
 const POLL_GAME_MS = 1300;

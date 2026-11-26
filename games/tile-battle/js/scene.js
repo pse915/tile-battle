@@ -1,7 +1,7 @@
 // Three.js 무대: 원목 테이블, 펠트, 조명, 카메라, 손패 배치, 타일 비행 연출
 import * as THREE from 'three';
 import { createTileMesh, createBackMesh, setAnisotropy, TILE_W, TILE_H, TILE_D } from './tiles.js';
-import { tween, updateTweens, ease, lerp } from './anim.js';
+import { tween, updateTweens, ease, lerp } from '../../../shared/anim.js';
 import { makeTile, shuffle } from './rules.js';
 
 const HAND_DIST = 3; // 카메라에서 손패까지 거리
