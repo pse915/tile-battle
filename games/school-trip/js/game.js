@@ -204,12 +204,12 @@ export class SchoolGame {
         toast(`${nm} 더블 세 번! 숙직실로 가요.`, 2000);
         break;
       case 'stay':
-        this.log(`🛏️ ${nm} 숙직실에서 쉬는 중 (${e.left}턴 남음)`);
-        toast(`${nm} 숙직실에서 쉬어요 (${e.left}턴 남음)`, 1500);
+        this.log(e.left ? `🛏️ ${nm} 숙직실에서 쉬는 중 (${e.left}턴 남음)` : `🛏️ ${nm} 숙직실에서 마지막 턴을 쉬었어요`);
+        toast(e.left ? `${nm} 숙직실에서 쉬어요 (${e.left}턴 남음)` : `${nm} 3턴을 다 쉬었어요. 다음 차례부터 움직여요`, 1600);
         await v.wait(0.4);
         break;
       case 'free':
-        this.log(`🚪 ${nm} 숙직실 탈출${e.how === 'pay' ? ` (${won(BAIL)} 냄)` : e.how === 'double' ? ' (더블!)' : ' (3턴 끝)'}`);
+        this.log(`🚪 ${nm} 숙직실 탈출${e.how === 'pay' ? ` (${won(BAIL)} 냄)` : e.how === 'double' ? ' (더블!)' : ' (3턴 다 쉼)'}`);
         break;
       case 'elev':
         a.elev();
