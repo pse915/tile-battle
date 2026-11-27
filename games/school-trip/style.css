@@ -1,0 +1,81 @@
+/* 서라벌학교여행 — 밝은 하늘색 교실, 파스텔 카툰 */
+:root {
+  --theme-bg: #bfe8ff;
+  --accent: #ffe36a;
+  --title-stroke: #2f6fb5;
+}
+#hud .hud-round { color: #2d2f4a; text-shadow: 0 1px 0 #fff, 0 0 6px #fff; }
+
+/* 참가자 칩 */
+.st-chips {
+  position: absolute; top: calc(62px + var(--safe-t)); left: 10px; right: 10px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px;
+  pointer-events: none !important;
+}
+.st-chip {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 5px 10px 5px 6px; border-radius: 999px; border: 3px solid #2d2f4a33;
+  background: rgba(255,255,255,.96); box-shadow: 0 4px 10px rgba(0,0,0,.25);
+  font-family: var(--display); font-size: 0.98rem;
+}
+.st-chip .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-chip b { margin-left: auto; font-size: 1.12rem; white-space: nowrap; }
+.st-chip.turn { border-color: #ff8a5c; box-shadow: 0 0 0 4px rgba(255,138,92,.4), 0 4px 10px rgba(0,0,0,.25); }
+.st-chip.out { opacity: .5; text-decoration: line-through; }
+.dot { flex: none; display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid #2d2f4a; vertical-align: middle; }
+
+/* 기록: 칩 아래 */
+.st-log { top: calc(150px + var(--safe-t)); }
+
+/* 아래 버튼 */
+.st-bottom { align-items: center; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(45,47,74,.45) 40%); }
+.st-flag {
+  max-width: calc(100% - 16px); padding: 6px 14px; min-height: 1.4em;
+  background: var(--accent); border: 2.5px solid #2d2f4a; border-radius: 12px;
+  font-family: var(--display); font-size: 1.1rem; text-align: center;
+}
+.st-flag:empty { visibility: hidden; }
+.st-bottom .k-actions .btn { min-height: 54px; font-size: 1.15rem; padding: 0 18px; }
+
+/* 행운 쪽지 뒤집기 */
+.st-cardfx { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(45,47,74,.35); z-index: 5; pointer-events: auto; }
+.st-cardfx[hidden] { display: none; }
+.st-card { width: min(260px, 72vw); aspect-ratio: 3 / 4; perspective: 900px; animation: stpop .35s cubic-bezier(.3,1.6,.6,1); }
+@keyframes stpop { from { transform: scale(.3) translateY(80px); } }
+.st-card-in { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.4,1.4,.5,1) .25s; }
+.st-cardfx.flip .st-card-in { transform: rotateY(180deg); }
+.st-card-back, .st-card-face {
+  position: absolute; inset: 0; backface-visibility: hidden; border: 4px solid #2d2f4a; border-radius: 18px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; text-align: center;
+  box-shadow: 0 10px 0 rgba(45,47,74,.35);
+}
+.st-card-back { background: repeating-linear-gradient(45deg, #ffb3c6 0 14px, #ffc9d6 14px 28px); font-size: 4rem; }
+.st-card-back b { font-family: var(--display); font-size: 1.5rem; }
+.st-card-face { background: #fffbe8; transform: rotateY(180deg); }
+.st-card-face.bad { background: #eef1ff; }
+.st-card-face b { font-family: var(--display); font-size: 1.5rem; }
+.st-card-face p { margin: 0; font-size: 1.05rem; line-height: 1.45; }
+.st-card-face small { color: #666; }
+.st-card-icon { font-size: 3rem; }
+
+/* 실 정보 */
+.st-info p { margin: 4px 0; }
+.st-rent { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 1rem; }
+.st-rent th, .st-rent td { border: 2px solid #2d2f4a22; padding: 4px 8px; text-align: left; }
+.st-rent tr.cur td { background: #fff3b0; font-weight: 700; }
+.st-rank { padding-left: 0; list-style: none; font-size: 1.1rem; }
+.st-rank li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #ccc; }
+.st-rank b { margin-left: auto; }
+.st-names { display: grid; gap: 10px; }
+.st-names label { display: flex; align-items: center; gap: 8px; }
+.st-names input { flex: 1; min-height: 44px; font-size: 1.1rem; padding: 0 10px; border: 2.5px solid #2d2f4a; border-radius: 10px; }
+.st-rounds .btn.primary { outline: 3px solid #2d2f4a; }
+
+@media (max-width: 560px) {
+  .st-chips { grid-template-columns: 1fr 1fr; gap: 4px; }
+  .st-chip { font-size: 0.82rem; padding: 3px 8px 3px 4px; }
+  .st-chip b { font-size: 0.95rem; }
+  .dot { width: 14px; height: 14px; }
+  .st-log { top: calc(140px + var(--safe-t)); }
+  .st-flag { font-size: 0.98rem; }
+}
