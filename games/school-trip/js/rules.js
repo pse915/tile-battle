@@ -218,7 +218,7 @@ function moveForwardTo(g, seat, target, evs) {
 
 function sendToJail(g, seat, evs) {
   const p = g.players[seat];
-  evs.push({ type: 'jump', seat, from: p.pos, to: 10 });
+  if (p.pos !== 10) evs.push({ type: 'jump', seat, from: p.pos, to: 10 });
   p.pos = 10;
   p.jail = JAIL_TURNS;
   p.elev = false;
@@ -254,6 +254,7 @@ function land(g, seat, evs, depth = 0) {
       }
     }
   } else if (c.kind === 'card') drawCard(g, seat, evs, depth);
+  else if (c.kind === 'jail') sendToJail(g, seat, evs); // 주사위로 숙직실에 멈춰도 쉬어가기
   else if (c.kind === 'welfare') {
     if (g.fund > 0) {
       const amt = g.fund;
@@ -373,18 +374,12 @@ export function roll(g, seat, dice) {
       p.jail = 0;
       evs.push({ type: 'free', seat, how: 'double' });
     } else {
+      // 더블이 아니면 이번 턴은 쉼. 3턴을 다 쉬면 다음 턴부터 자유롭게 움직임
       p.jail--;
-      if (p.jail > 0) {
-        evs.push({ type: 'stay', seat, left: p.jail });
-        finishTurn(g, evs);
-        return evs;
-      }
-      pay(g, seat, BAIL, 'fund', evs);
-      evs.push({ type: 'free', seat, how: 'time' });
-      if (p.out) {
-        finishTurn(g, evs);
-        return evs;
-      }
+      evs.push({ type: 'stay', seat, left: p.jail });
+      if (p.jail === 0) evs.push({ type: 'free', seat, how: 'time' });
+      finishTurn(g, evs);
+      return evs;
     }
   } else if (dbl) {
     g.dbl++;
@@ -603,7 +598,7 @@ export function runSelfTests(n) {
   roll(g, 0, [2, 2]);
   if (g.phase === 'buy') skip(g, 0);
   ok('더블이면 같은 사람 한 번 더', g.turn === 0 && g.phase === 'roll');
-  roll(g, 0, [3, 3]);
+  roll(g, 0, [5, 5]); // 4+10=14 가정실 (숙직실·행운 쪽지 칸은 피함)
   if (g.phase === 'buy') skip(g, 0);
   roll(g, 0, [1, 1]);
   ok('더블 세 번이면 숙직실', g.players[0].pos === 10 && g.players[0].jail === JAIL_TURNS && g.turn === 1);
@@ -616,6 +611,26 @@ export function runSelfTests(n) {
   g.turn = 0;
   roll(g, 0, [3, 3]);
   ok('더블이면 탈출', g.players[0].jail === 0 && g.players[0].pos === 16);
+  // 주사위로 숙직실 칸에 멈춰도 갇힘
+  g = newGame(2);
+  g.players[0].pos = 4;
+  roll(g, 0, [2, 4]);
+  ok('주사위로 숙직실에 멈추면 갇힘', g.players[0].pos === 10 && g.players[0].jail === JAIL_TURNS);
+  // 3턴을 꼬박 쉬고 4번째 턴에 움직임
+  g = newGame(2);
+  g.players[0].pos = 10;
+  g.players[0].jail = JAIL_TURNS;
+  let rested = 0;
+  for (let k = 0; k < 3; k++) {
+    g.turn = 0;
+    g.phase = 'roll';
+    roll(g, 0, [1, 2]);
+    if (g.players[0].pos === 10) rested++;
+  }
+  g.turn = 0;
+  g.phase = 'roll';
+  roll(g, 0, [1, 2]);
+  ok('숙직실 3턴 쉬고 4번째 턴에 이동', rested === 3 && g.players[0].jail === 0 && g.players[0].pos === 13);
   // 엘리베이터
   g = newGame(2);
   g.players[0].pos = 30;
