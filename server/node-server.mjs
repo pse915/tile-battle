@@ -86,6 +86,7 @@ const ctx = vm.createContext({
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (text) => ({ text, setMimeType() { return this; } }) },
   Utilities: { getUuid: () => randomUUID() },
   SpreadsheetApp,
+  ROOM_CODE_ODD: true, // 집 서버 방 코드는 끝자리 홀수 (앱스크립트는 짝수)
   Math,
   Date,
   JSON,

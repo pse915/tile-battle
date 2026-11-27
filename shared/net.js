@@ -1,8 +1,18 @@
 // 앱스크립트 웹 앱과 주고받기
-import { ONLINE_URL } from './config.js';
+import { ONLINE_URL, serverFor, serverForCode } from './config.js';
 import { localServer } from './local-server.js';
 
-/** 테스트용: ?api=주소 로 서버를 바꿀 수 있음 (탭을 닫으면 원래대로) */
+/** 테스트용: ?api=주소 로 모든 요청을 한 서버로 보낼 수 있음 (탭을 닫으면 원래대로) */
+export function apiOverride() {
+  const q = new URLSearchParams(location.search).get('api');
+  if (q) return apiUrl();
+  try {
+    return sessionStorage.getItem('games:api') || '';
+  } catch {
+    return '';
+  }
+}
+
 export function apiUrl() {
   const q = new URLSearchParams(location.search).get('api');
   if (q) {
@@ -35,7 +45,9 @@ export async function api(action, payload = {}, opts = {}) {
   }
   let res;
   try {
-    res = await fetch(apiUrl(), {
+    // 서버 고르기: ?api= 가 있으면 그쪽, 아니면 게임 이름 → 방 코드 끝자리 → 기본 서버
+    const url = apiOverride() || (payload.game ? serverFor(payload.game) : payload.code ? serverForCode(payload.code) : ONLINE_URL);
+    res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, ...payload }),
