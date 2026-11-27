@@ -1,7 +1,7 @@
 /* 심해 보물섬 탐험대 — 공용 OMR 스타일(ui-core.css) 위에 밤바다 테마 */
 :root {
-  --sea: #061321;
-  --sea-2: #0b2b47;
+  --sea: #2b3f86;
+  --sea-2: #1c2350;
   --gold: #e8c15a;
   --wood: var(--sea);
 }

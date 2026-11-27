@@ -1,38 +1,51 @@
 // 급식 다섯! 3D: 급식실 테이블, 자리마다 뒤집힌 더미 + 공개 더미(맨 위 카드), 가운데 반짝이는 종
 // 반짝임은 늘 똑같이 — 합이 5가 되는 순간을 알려 주는 효과는 절대 넣지 않음 (힌트 금지)
-import { TableStage, THREE, cardMesh, canvasTexture } from '../../../shared/table3d.js';
+import { TableStage, THREE, canvasTexture, toonMat, addOutline } from '../../../shared/table3d.js';
 import { tween, ease, wait } from '../../../shared/anim.js';
 import { cardTexture, backTexture, CARD_W, CARD_H, CARD_T } from './cards.js';
+
+// 카툰 외곽선 색 (카드 테두리와 같은 남색 계열)
+const LINE = 0x2b2d55;
+const sideMat = toonMat(0xfffaf0);
+let stage = null; // 외곽선 켜짐 여부 확인용
+
+/** 카툰 카드: 3단 명암 재질 + 남색 외곽선 (shared cardMesh와 같은 모양·재질 순서) */
+function cardMesh({ w, h, t, face, back }) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, t, h), [sideMat, sideMat, toonMat(0xffffff, { map: face }), toonMat(0xffffff, { map: back }), sideMat, sideMat]);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  outline(m, 0.025);
+  return m;
+}
+function outline(mesh, thickness = 0.04, color = LINE) {
+  const o = addOutline(mesh, { color, thickness });
+  o.visible = stage?.outlinesOn !== false;
+  return o;
+}
 
 const TABLE_W = 13;
 const TABLE_D = 9;
 const STACK_STEP = 0.012;
 
 function drawFelt(ctx, w, h) {
-  // 급식실 테이블: 연한 민트 상판 + 잔 점무늬
-  ctx.fillStyle = '#d9efe6';
+  // 급식실 테이블: 진한 민트 단색 상판 (카드 바탕보다 진해서 카드가 또렷이 떠 보임)
+  ctx.fillStyle = '#7fcfb8';
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(70,120,110,.10)';
-  for (let i = 0; i < 1600; i++) {
-    ctx.beginPath();
-    ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 2 + 0.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
   // 가운데 종 받침 자리 (둥근 매트)
   ctx.fillStyle = '#f7e3b3';
   ctx.beginPath();
   ctx.arc(w / 2, h / 2, h * 0.17, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#e2b866';
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#d99a2b';
+  ctx.lineWidth = 7;
   ctx.setLineDash([16, 10]);
   ctx.beginPath();
   ctx.arc(w / 2, h / 2, h * 0.15, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.strokeStyle = 'rgba(255,255,255,.6)';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(14, 14, w - 28, h - 28);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(16, 16, w - 32, h - 32);
 }
 
 // 한 기기 모드: 화면 가장자리와 맞는 자리
@@ -51,15 +64,18 @@ export const EDGES = ['bottom', 'top', 'left', 'right'];
 export class LunchStage {
   constructor(container) {
     this.stage = new TableStage(container, {
-      bg: 0xbfdce6,
-      floor: 0x9fb6bf,
-      rim: 0xaab4bd,
+      bg: 0xfff1d6,
+      floor: 0xf6d9a8,
+      rim: 0xffb36b,
+      toon: true,
+      fitWidth: 9.4,
       tableW: TABLE_W,
       tableD: TABLE_D,
       drawFelt,
       camera: { land: [0, 11.5, 7.6], target: [0, 0, 0.4], port: [0, 13, 4.2], portTarget: [0, 0, 0.3] },
     });
     this.s = this.stage;
+    stage = this.stage;
     this.seats = [];
     this.onPick = null; // ({ seat } | { bell: true })
     this.s.onPick = (d) => this.onPick?.(d);
@@ -86,7 +102,7 @@ export class LunchStage {
   buildRoom() {
     const g = this.s.group;
     // 테이블 다리 + 의자 몇 개 + 식판 장식
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x8c96a0, metalness: 0.6, roughness: 0.35 });
+    const legMat = toonMat(0xb9c4d6);
     [
       [-TABLE_W / 2 + 0.6, -TABLE_D / 2 + 0.6],
       [TABLE_W / 2 - 0.6, -TABLE_D / 2 + 0.6],
@@ -95,9 +111,11 @@ export class LunchStage {
     ].forEach(([x, z]) => {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2.8, 12), legMat);
       leg.position.set(x, -1.6, z);
+      outline(leg, 0.04);
       g.add(leg);
     });
-    const stoolMat = new THREE.MeshStandardMaterial({ color: 0xff9f43, roughness: 0.5 });
+    const stoolMat = toonMat(0xff9f6b);
+    const stoolMat2 = toonMat(0x6fd6c2);
     [
       [-3, TABLE_D / 2 + 1.4],
       [3, TABLE_D / 2 + 1.4],
@@ -106,16 +124,20 @@ export class LunchStage {
       [-TABLE_W / 2 - 1.4, 0],
       [TABLE_W / 2 + 1.4, 0],
     ].forEach(([x, z], i) => {
-      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.22, 24), i % 2 ? stoolMat : new THREE.MeshStandardMaterial({ color: 0x48c9b0, roughness: 0.5 }));
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.22, 24), i % 2 ? stoolMat : stoolMat2);
       seat.position.set(x, -1.0, z);
+      outline(seat, 0.05);
       g.add(seat);
     });
     // 식판(스테인리스) 장식 두 개
     const trayTex = canvasTexture(
       'lf-tray',
       (ctx, w, h) => {
-        ctx.fillStyle = '#c9d1d8';
+        ctx.fillStyle = '#dfe6ef';
         ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#2b2d55';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(3, 3, w - 6, h - 6);
         const cells = [
           [12, 12, 70, 50],
           [92, 12, 70, 50],
@@ -124,11 +146,11 @@ export class LunchStage {
           [134, 72, 110, 50],
         ];
         cells.forEach(([x, y, cw, ch]) => {
-          const gr = ctx.createLinearGradient(x, y, x, y + ch);
-          gr.addColorStop(0, '#9aa6b0');
-          gr.addColorStop(1, '#e6ebef');
-          ctx.fillStyle = gr;
+          ctx.fillStyle = '#b4c0d0';
           ctx.fillRect(x, y, cw, ch);
+          ctx.strokeStyle = '#6f7d94';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x, y, cw, ch);
         });
       },
       256,
@@ -141,8 +163,9 @@ export class LunchStage {
     ].forEach(([x, z, r]) => {
       const tray = new THREE.Mesh(
         new THREE.BoxGeometry(1.9, 0.06, 1.0),
-        [0, 0, 0, 0, 0, 0].map((_, i) => (i === 2 ? new THREE.MeshStandardMaterial({ map: trayTex, metalness: 0.5, roughness: 0.35 }) : legMat)),
+        [0, 0, 0, 0, 0, 0].map((_, i) => (i === 2 ? toonMat(0xffffff, { map: trayTex }) : legMat)),
       );
+      outline(tray, 0.03);
       tray.position.set(x, 0.03, z);
       tray.rotation.y = r;
       tray.receiveShadow = true;
@@ -153,19 +176,24 @@ export class LunchStage {
 
   buildBell() {
     const b = new THREE.Group();
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x6b3f22, roughness: 0.5 });
+    const baseMat = toonMat(0xe0703c);
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.22, 40), baseMat);
     base.position.y = 0.11;
     base.castShadow = true;
+    outline(base, 0.05);
     b.add(base);
-    this.domeMat = new THREE.MeshStandardMaterial({ color: 0xffc93c, metalness: 0.85, roughness: 0.22, emissive: 0x6a4300, emissiveIntensity: 0.25 });
+    this.domeMat = toonMat(0xffcf3f, { emissive: 0x5a3a00 });
+    this.domeMat.emissiveIntensity = 0.2;
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.72, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), this.domeMat);
     dome.position.y = 0.2;
     dome.castShadow = true;
-    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.22, 16), new THREE.MeshStandardMaterial({ color: 0xe8e8ee, metalness: 0.9, roughness: 0.2 }));
+    outline(dome, 0.05);
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.22, 16), toonMat(0xf2f0f8));
+    outline(knob, 0.03);
     knob.position.y = 0.95;
     const knobTop = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 12), knob.material);
     knobTop.position.y = 1.08;
+    outline(knobTop, 0.035);
     this.dome = new THREE.Group();
     this.dome.add(dome, knob, knobTop);
     b.add(this.dome);
@@ -180,16 +208,13 @@ export class LunchStage {
     this.wave.rotation.x = -Math.PI / 2;
     this.wave.position.y = 0.05;
     b.add(this.wave);
-    const glow = new THREE.PointLight(0xffd36b, 0.6, 5);
-    glow.position.set(0, 1.6, 0);
-    b.add(glow);
     this.bell = b;
     this.s.group.add(b);
     // 늘 같은 속도로 반짝 (상태와 무관)
     let t = 0;
     this.s.frame.add((dt) => {
       t += dt;
-      this.domeMat.emissiveIntensity = 0.2 + Math.sin(t * 2.2) * 0.08;
+      this.domeMat.emissiveIntensity = 0.16 + Math.sin(t * 2.2) * 0.06;
     });
   }
 
@@ -248,7 +273,7 @@ export class LunchStage {
       const openPos = pos.clone().multiplyScalar(0.5).add(side.clone().multiplyScalar(0.0));
       const group = new THREE.Group();
       this.s.group.add(group);
-      const pile = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: backTexture(), back: backTexture(), side: 0xf0ede4 });
+      const pile = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: backTexture(), back: backTexture() });
       pile.rotation.y = yaw;
       group.add(pile);
       const pileHit = new THREE.Mesh(new THREE.BoxGeometry(CARD_W * 1.2, 0.8, CARD_H * 1.2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
@@ -257,7 +282,7 @@ export class LunchStage {
       pileHit.userData = { seat: i };
       group.add(pileHit);
       this.s.pickables.add(pileHit);
-      const openStack = new THREE.Mesh(new THREE.BoxGeometry(CARD_W, 1, CARD_H), new THREE.MeshStandardMaterial({ color: 0xf5f1e6, roughness: 0.7 }));
+      const openStack = new THREE.Mesh(new THREE.BoxGeometry(CARD_W, 1, CARD_H), sideMat);
       openStack.rotation.y = yaw;
       openStack.castShadow = true;
       group.add(openStack);
@@ -265,7 +290,7 @@ export class LunchStage {
       top.rotation.y = yaw;
       group.add(top);
       // 탈락 표시용 회색 판
-      const outMark = new THREE.Mesh(new THREE.CircleGeometry(0.55, 28), new THREE.MeshBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.35, depthWrite: false }));
+      const outMark = new THREE.Mesh(new THREE.CircleGeometry(0.55, 28), new THREE.MeshBasicMaterial({ color: 0x2b2d55, transparent: true, opacity: 0.3, depthWrite: false }));
       outMark.rotation.x = -Math.PI / 2;
       outMark.position.copy(pilePos).setY(0.01);
       outMark.visible = false;
@@ -284,6 +309,9 @@ export class LunchStage {
     const h = Math.max(CARD_T, count * STACK_STEP);
     st.pile.visible = count > 0;
     st.pile.scale.y = h / CARD_T;
+    // 외곽선 두께가 더미 높이에 따라 늘어나지 않게 보정
+    const ol = st.pile.children.find((c) => c.userData.outline);
+    if (ol) ol.scale.y = 1 + 0.05 / h;
     st.pile.position.copy(st.pilePos).setY(h / 2);
   }
 
@@ -331,6 +359,20 @@ export class LunchStage {
     await this.s.moveTo(m, { pos: to, rotZ: 0, duration: dur, lift: 0.7 });
     this.s.group.remove(m);
     this.setOpen(i, code, st.openCount + 1);
+    this.boing(st.top);
+  }
+
+  /** 카드가 내려앉을 때 살짝 통통 (과하지 않게) */
+  boing(obj, amount = 1) {
+    return tween({
+      duration: 0.3,
+      ease: ease.linear,
+      update: (k) => {
+        const w = Math.sin(k * Math.PI * 2) * Math.exp(-k * 3) * 0.12 * amount;
+        obj.scale.set(1 + w, 1, 1 + w);
+      },
+      complete: () => obj.scale.set(1, 1, 1),
+    });
   }
 
   /** 맞힘: 모든 공개 카드가 친 사람 더미로 날아감 */
@@ -352,6 +394,7 @@ export class LunchStage {
     await Promise.all(flying.map((m, k) => this.s.moveTo(m, { pos: dst.pilePos.clone().setY(dst.pileCount * STACK_STEP + 0.05), rotZ: Math.PI, rotY: dst.yaw, duration: dur, delay: k * 0.05, lift: 1.4 })));
     flying.forEach((m) => this.s.group.remove(m));
     this.setPile(seat, dst.pileCount + got);
+    if (got) this.boing(dst.pile, 0.8);
   }
 
   /** 틀림: 친 사람 더미에서 다른 사람들에게 1장씩 */

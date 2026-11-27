@@ -18,38 +18,22 @@ function rng(seed) {
 }
 
 function board(ctx, w, h, seed) {
-  const r = rng(seed);
-  // 나무 테두리
-  roundRect(ctx, 0, 0, w, h, 22);
-  const wood = ctx.createLinearGradient(0, 0, w, h);
-  wood.addColorStop(0, '#c99a62');
-  wood.addColorStop(1, '#9a6b3c');
-  ctx.fillStyle = wood;
+  // 카툰: 두꺼운 남색 테두리 → 밝은 나무 틀 → 단색 칠판
+  roundRect(ctx, 0, 0, w, h, 26);
+  ctx.fillStyle = INK;
   ctx.fill();
-  // 칠판
-  roundRect(ctx, 11, 11, w - 22, h - 22, 14);
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#2a3d36');
-  g.addColorStop(1, '#1a2924');
-  ctx.fillStyle = g;
+  roundRect(ctx, 7, 7, w - 14, h - 14, 20);
+  ctx.fillStyle = '#f2c98a';
   ctx.fill();
-  ctx.save();
-  ctx.clip();
-  // 분필 가루
-  for (let i = 0; i < 140; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${0.03 + r() * 0.07})`;
-    ctx.fillRect(r() * w, r() * h, 1 + r() * 3, 1 + r() * 2);
-  }
-  // 지우개 자국
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 26;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(20, h * (0.15 + r() * 0.1));
-  ctx.quadraticCurveTo(w / 2, h * 0.1, w - 20, h * (0.2 + r() * 0.1));
+  roundRect(ctx, 17, 17, w - 34, h - 34, 14);
+  ctx.fillStyle = '#3f9474';
+  ctx.fill();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = INK;
   ctx.stroke();
-  ctx.restore();
 }
+
+const INK = '#1f3550';
 
 /** 형광펜으로 한 번 쓱 그은 자국 */
 function swipe(ctx, color, cx, cy, len, thick, angle, seed, alpha = 0.55) {
@@ -107,9 +91,25 @@ function shape(ctx, col, x, y, s) {
   shapePath(ctx, col, x, y, s);
   ctx.fillStyle = COLOR_HEX[col];
   ctx.fill();
-  ctx.lineWidth = Math.max(2, s * 0.14);
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(3, s * 0.18);
+  ctx.strokeStyle = INK;
   ctx.stroke();
+}
+
+/** 가운데 색 판: 둥근 단색 타원 + 남색 테두리 (형광펜 자국 대신) */
+function blob(ctx, color, w, h) {
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(-0.25);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.4, h * 0.3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function chalkText(ctx, text, x, y, size, fill) {
@@ -117,8 +117,11 @@ function chalkText(ctx, text, x, y, size, fill) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = size * 0.12;
-  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+  ctx.lineWidth = size * 0.22;
+  ctx.strokeStyle = INK;
+  ctx.strokeText(text, x, y);
+  ctx.lineWidth = size * 0.1;
+  ctx.strokeStyle = '#ffffff';
   ctx.strokeText(text, x, y);
   ctx.fillStyle = fill;
   ctx.fillText(text, x, y);
@@ -127,7 +130,7 @@ function chalkText(ctx, text, x, y, size, fill) {
 /** 건너뛰기: 손바닥 '멈춰' 표지 */
 function iconSkip(ctx, x, y, s, col) {
   ctx.lineWidth = s * 0.2;
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = INK;
   ctx.fillStyle = col;
   ctx.beginPath();
   ctx.arc(x, y, s, 0, Math.PI * 2);
@@ -158,7 +161,7 @@ function iconReverse(ctx, x, y, s, col) {
     ctx.fillStyle = col;
     ctx.fill();
     ctx.lineWidth = s * 0.12;
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = INK;
     ctx.stroke();
     ctx.restore();
   };
@@ -173,20 +176,23 @@ function drawFace(ctx, w, h, code) {
   const wild = col === 'w';
   const hex = wild ? '#ffffff' : COLOR_HEX[col];
   if (wild) {
-    COLORS.forEach((c, i) => swipe(ctx, COLOR_HEX[c], w / 2, h * 0.3 + i * h * 0.13, w * 0.9, 40, -0.12, code + i, 0.6));
+    COLORS.forEach((c, i) => swipe(ctx, COLOR_HEX[c], w / 2, h * 0.3 + i * h * 0.13, w * 0.9, 40, -0.12, code + i, 1));
   } else {
-    swipe(ctx, hex, w / 2, h / 2, w * 1.05, 120, -0.38, code);
+    blob(ctx, hex, w, h);
   }
   // 가운데
   if (isNumber(code)) {
-    chalkText(ctx, v, w / 2, h / 2 + 6, 168, hex);
+    chalkText(ctx, v, w / 2, h / 2 + 6, 176, '#ffffff');
     if (v === '6' || v === '9') {
       ctx.fillStyle = '#fff';
-      ctx.fillRect(w / 2 - 34, h / 2 + 86, 68, 8); // 6과 9 구분 밑줄
+      ctx.fillStyle = INK;
+      ctx.fillRect(w / 2 - 40, h / 2 + 82, 80, 16);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(w / 2 - 35, h / 2 + 86, 70, 8); // 6과 9 구분 밑줄
     }
-  } else if (v === 'S') iconSkip(ctx, w / 2, h / 2, 62, hex);
-  else if (v === 'R') iconReverse(ctx, w / 2, h / 2, 74, hex);
-  else if (v === 'D') chalkText(ctx, '+2', w / 2, h / 2 + 4, 118, hex);
+  } else if (v === 'S') iconSkip(ctx, w / 2, h / 2, 62, '#ffffff');
+  else if (v === 'R') iconReverse(ctx, w / 2, h / 2, 74, '#ffffff');
+  else if (v === 'D') chalkText(ctx, '+2', w / 2, h / 2 + 4, 124, '#ffffff');
   else if (v === 'F') {
     COLORS.forEach((c, i) => shape(ctx, c, w / 2 + (i % 2 ? 46 : -46), h / 2 + (i < 2 ? -78 : 82), 22));
     chalkText(ctx, '+4', w / 2, h / 2 + 4, 116, '#ffe36a');
@@ -200,6 +206,10 @@ function drawFace(ctx, w, h, code) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = INK;
+    ctx.strokeText(corner, 40, 46);
     ctx.fillText(corner, 40, 46);
     if (!wild) shape(ctx, col, 40, 88, 13);
     else {
@@ -223,7 +233,7 @@ function drawFace(ctx, w, h, code) {
 
 function drawBack(ctx, w, h) {
   board(ctx, w, h, 'back');
-  COLORS.forEach((c, i) => swipe(ctx, COLOR_HEX[c], w / 2, h * 0.36 + i * 34, w * 0.8, 26, -0.3 + i * 0.05, 'b' + i, 0.7));
+  COLORS.forEach((c, i) => swipe(ctx, COLOR_HEX[c], w / 2, h * 0.36 + i * 34, w * 0.8, 26, -0.3 + i * 0.05, 'b' + i, 1));
   ctx.save();
   ctx.translate(w / 2, h / 2);
   ctx.rotate(-0.12);

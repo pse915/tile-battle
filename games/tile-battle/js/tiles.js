@@ -2,6 +2,15 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { SUITS } from './rules.js';
+import { toonMat, addOutline } from '../../../shared/table3d.js';
+
+const INK = '#2a2240'; // 카툰 외곽선 색 (3D 외곽선과 같은 계열)
+const OUTLINE = 0x2a2240;
+let outlinesOn = true;
+/** 낮음 품질에서 새로 만드는 타일 외곽선 끔 */
+export function setTileOutlines(on) {
+  outlinesOn = on;
+}
 
 export const TILE_W = 0.7;
 export const TILE_H = 1.0;
@@ -37,17 +46,26 @@ export function drawSuit(ctx, s, cx, cy, size) {
   const color = SUITS[s].color;
   ctx.save();
   ctx.fillStyle = color;
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-  ctx.lineWidth = size * 0.04;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = size * 0.07;
+  ctx.lineJoin = 'round';
   const r = size / 2;
   if (s === 0) {
     // 구름: 둥근 덩어리 세 개 + 평평한 바닥
-    ctx.beginPath();
-    ctx.arc(cx - r * 0.45, cy + r * 0.12, r * 0.38, 0, Math.PI * 2);
-    ctx.arc(cx + r * 0.05, cy - r * 0.18, r * 0.5, 0, Math.PI * 2);
-    ctx.arc(cx + r * 0.52, cy + r * 0.12, r * 0.36, 0, Math.PI * 2);
-    ctx.fill();
-    roundRect(ctx, cx - r * 0.83, cy + r * 0.05, r * 1.7, r * 0.45, r * 0.22);
+    const cloud = () => {
+      ctx.beginPath();
+      ctx.arc(cx - r * 0.45, cy + r * 0.12, r * 0.38, 0, Math.PI * 2);
+      ctx.moveTo(cx + r * 0.55, cy - r * 0.18);
+      ctx.arc(cx + r * 0.05, cy - r * 0.18, r * 0.5, 0, Math.PI * 2);
+      ctx.moveTo(cx + r * 0.88, cy + r * 0.12);
+      ctx.arc(cx + r * 0.52, cy + r * 0.12, r * 0.36, 0, Math.PI * 2);
+      ctx.rect(cx - r * 0.6, cy + r * 0.05, r * 1.2, r * 0.45);
+    };
+    // 외곽선을 두껍게 먼저 깔고 그 위에 색 → 겹친 원의 안쪽 선이 안 보임
+    ctx.lineWidth = size * 0.14;
+    cloud();
+    ctx.stroke();
+    cloud();
     ctx.fill();
   } else if (s === 1) {
     // 별: 뾰족한 다섯 꼭짓점
@@ -58,22 +76,32 @@ export function drawSuit(ctx, s, cx, cy, size) {
       ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 1.02);
     }
     ctx.closePath();
-    ctx.fill();
     ctx.stroke();
+    ctx.fill();
   } else if (s === 2) {
     // 달: 초승달 (임시 캔버스에서 잘라냄)
     const c = document.createElement('canvas');
     c.width = c.height = Math.ceil(size * 1.2);
     const g = c.getContext('2d');
     const o = c.width / 2;
-    g.fillStyle = color;
-    g.beginPath();
-    g.arc(o, o, r * 0.92, 0, Math.PI * 2);
-    g.fill();
-    g.globalCompositeOperation = 'destination-out';
-    g.beginPath();
-    g.arc(o + r * 0.42, o - r * 0.22, r * 0.74, 0, Math.PI * 2);
-    g.fill();
+    // 진한 색 초승달(조금 크게) 위에 문양 색 초승달 → 테두리
+    const crescent = (fill, grow) => {
+      g.globalCompositeOperation = 'source-over';
+      const t = document.createElement('canvas');
+      t.width = t.height = c.width;
+      const h = t.getContext('2d');
+      h.fillStyle = fill;
+      h.beginPath();
+      h.arc(o, o, r * 0.92 + grow, 0, Math.PI * 2);
+      h.fill();
+      h.globalCompositeOperation = 'destination-out';
+      h.beginPath();
+      h.arc(o + r * 0.42, o - r * 0.22, r * 0.74 - grow, 0, Math.PI * 2);
+      h.fill();
+      g.drawImage(t, 0, 0);
+    };
+    crescent(INK, size * 0.045);
+    crescent(color, 0);
     ctx.drawImage(c, cx - o, cy - o);
   } else {
     // 해: 원 + 여덟 개의 삼각 광선
@@ -83,12 +111,15 @@ export function drawSuit(ctx, s, cx, cy, size) {
       ctx.moveTo(cx + Math.cos(a - 0.2) * r * 0.62, cy + Math.sin(a - 0.2) * r * 0.62);
       ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
       ctx.lineTo(cx + Math.cos(a + 0.2) * r * 0.62, cy + Math.sin(a + 0.2) * r * 0.62);
+      ctx.closePath();
+      ctx.stroke();
       ctx.fill();
     }
     ctx.beginPath();
     ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.beginPath();
     ctx.arc(cx - r * 0.15, cy - r * 0.15, r * 0.16, 0, Math.PI * 2);
     ctx.fill();
@@ -130,31 +161,39 @@ function faceCanvas(tile) {
   c.height = FACE_H;
   const ctx = c.getContext('2d');
   const suit = SUITS[tile.s];
-  // 바탕: 상아색 + 아주 옅은 세로 그러데이션
-  const g = ctx.createLinearGradient(0, 0, 0, FACE_H);
-  g.addColorStop(0, '#fffef9');
-  g.addColorStop(1, '#f3efe2');
-  ctx.fillStyle = g;
+  // 바탕: 단색 크림 (카툰: 그러데이션 없음)
+  ctx.fillStyle = '#fffaf0';
   ctx.fillRect(0, 0, FACE_W, FACE_H);
-  // 문양 색 테두리
-  ctx.strokeStyle = suit.color;
-  ctx.lineWidth = 7;
-  roundRect(ctx, 18, 18, FACE_W - 36, FACE_H - 36, 22);
+  // 두꺼운 진한 테두리 + 안쪽 문양 색 띠
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 12;
+  roundRect(ctx, 12, 12, FACE_W - 24, FACE_H - 24, 30);
   ctx.stroke();
-  // 숫자
-  ctx.fillStyle = suit.color;
+  ctx.strokeStyle = suit.color;
+  ctx.lineWidth = 8;
+  roundRect(ctx, 26, 26, FACE_W - 52, FACE_H - 52, 20);
+  ctx.stroke();
+  // 큰 숫자 (진한 테두리)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fs = tile.n >= 10 ? 128 : 158;
+  const fs = tile.n >= 10 ? 140 : 176;
   ctx.font = `${fs}px ${DISPLAY_FONT}`;
-  ctx.fillText(String(tile.n), FACE_W / 2, 128);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 14;
+  ctx.strokeText(String(tile.n), FACE_W / 2, 130);
+  ctx.fillStyle = suit.color;
+  ctx.fillText(String(tile.n), FACE_W / 2, 130);
   // 문양
-  drawSuit(ctx, tile.s, FACE_W / 2, 262, 118);
-  // 2는 가장 센 숫자라 금색 점으로 표시
+  drawSuit(ctx, tile.s, FACE_W / 2, 268, 112);
+  // 2는 가장 센 숫자라 금색 별점으로 표시
   if (tile.n === 2) {
-    ctx.fillStyle = '#e0a400';
+    ctx.fillStyle = '#ffc928';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(FACE_W - 44, 44, 9, 0, Math.PI * 2);
+    ctx.arc(FACE_W - 48, 48, 13, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.fill();
   }
   return c;
@@ -172,8 +211,12 @@ function backCanvas() {
   c.width = FACE_W;
   c.height = FACE_H;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#1e3a5f';
+  ctx.fillStyle = '#4a6fb5';
   ctx.fillRect(0, 0, FACE_W, FACE_H);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 12;
+  roundRect(ctx, 12, 12, FACE_W - 24, FACE_H - 24, 30);
+  ctx.stroke();
   // OMR 답안지 마킹 칸 무늬
   const cols = 6, rows = 9;
   const filled = new Set([3, 8, 16, 21, 27, 34, 40, 47, 51]);
@@ -187,7 +230,7 @@ function backCanvas() {
         ctx.fillStyle = '#ffd84d';
         ctx.fill();
       } else {
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 2.5;
         ctx.stroke();
       }
@@ -196,7 +239,9 @@ function backCanvas() {
   ctx.fillStyle = '#ffd84d';
   roundRect(ctx, 58, 136, 140, 94, 20);
   ctx.fill();
-  ctx.fillStyle = '#1e3a5f';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  ctx.fillStyle = INK;
   ctx.font = `64px ${DISPLAY_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -207,22 +252,27 @@ function backCanvas() {
 function shared() {
   if (!geometry) {
     geometry = new RoundedBoxGeometry(TILE_W, TILE_H, TILE_D, 3, 0.07);
-    bodyMat = new THREE.MeshStandardMaterial({ color: 0xf6f0de, roughness: 0.32, metalness: 0.0 });
-    backMat = new THREE.MeshStandardMaterial({ map: makeTexture(backCanvas()), roughness: 0.4 });
+    bodyMat = toonMat(0xfff3d6);
+    backMat = toonMat(0xffffff, { map: makeTexture(backCanvas()) });
   }
+}
+
+function outline(mesh, thickness = 0.028) {
+  addOutline(mesh, { color: OUTLINE, thickness }).visible = outlinesOn;
 }
 
 /** 앞면이 보이는 타일 메시 */
 export function createTileMesh(tile) {
   shared();
   if (!faceCache.has(tile.id)) {
-    faceCache.set(tile.id, new THREE.MeshStandardMaterial({ map: makeTexture(faceCanvas(tile)), roughness: 0.3 }));
+    faceCache.set(tile.id, toonMat(0xffffff, { map: makeTexture(faceCanvas(tile)) }));
   }
   // BoxGeometry 면 순서: +x, -x, +y, -y, +z(앞), -z(뒤)
   const mesh = new THREE.Mesh(geometry, [bodyMat, bodyMat, bodyMat, bodyMat, faceCache.get(tile.id), backMat]);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.tile = tile;
+  outline(mesh);
   return mesh;
 }
 
@@ -231,6 +281,7 @@ export function createBackMesh() {
   shared();
   const mesh = new THREE.Mesh(geometry, [bodyMat, bodyMat, bodyMat, bodyMat, backMat, backMat]);
   mesh.castShadow = true;
+  outline(mesh, 0.05);
   return mesh;
 }
 

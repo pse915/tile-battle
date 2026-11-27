@@ -2,6 +2,11 @@
 // 게임은 TableStage를 만들고 stage.group 아래에 자기 물건을 올리면 됨.
 import * as THREE from 'three';
 import { updateTweens, tween, ease, lerp } from './anim.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 export { THREE };
 
@@ -66,6 +71,42 @@ export function setCardFace(mesh, face) {
   mesh.material[2].needsUpdate = true;
 }
 
+// ---------- 카툰 렌더링 도우미 ----------
+let toonRamp = null;
+/** 3단계 명암 (어두움 · 중간 · 밝음) — 계단처럼 끊어져 또렷하게 */
+export function toonGradient() {
+  if (toonRamp) return toonRamp;
+  const data = new Uint8Array([110, 110, 110, 255, 190, 190, 190, 255, 255, 255, 255, 255]);
+  toonRamp = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
+  toonRamp.minFilter = toonRamp.magFilter = THREE.NearestFilter;
+  toonRamp.generateMipmaps = false;
+  toonRamp.needsUpdate = true;
+  return toonRamp;
+}
+/** 툰 재질 */
+export function toonMat(color, { map = null, emissive = 0x000000, side = THREE.FrontSide } = {}) {
+  return new THREE.MeshToonMaterial({ color, map, gradientMap: toonGradient(), emissive, side });
+}
+const outlineMats = new Map();
+/**
+ * 외곽선: 뒷면만 그리는 살짝 큰 복제 메시(inverted hull) — 후처리보다 훨씬 가벼움
+ * 색은 검정 대신 따뜻한 남색 계열이 기본
+ */
+export function addOutline(mesh, { color = 0x2a2240, thickness = 0.04 } = {}) {
+  if (!outlineMats.has(color)) outlineMats.set(color, new THREE.MeshBasicMaterial({ color, side: THREE.BackSide }));
+  const geo = mesh.geometry;
+  geo.computeBoundingBox();
+  const size = new THREE.Vector3();
+  geo.boundingBox.getSize(size);
+  const o = new THREE.Mesh(geo, outlineMats.get(color));
+  // 크기에 상관없이 테두리 두께가 비슷하게 보이도록 축마다 비율 계산
+  o.scale.set(1 + (thickness * 2) / Math.max(size.x, 0.01), 1 + (thickness * 2) / Math.max(size.y, 0.01), 1 + (thickness * 2) / Math.max(size.z, 0.01));
+  o.userData.outline = true;
+  o.raycast = () => {};
+  mesh.add(o);
+  return o;
+}
+
 export class TableStage {
   /**
    * @param {HTMLElement} container
@@ -114,11 +155,38 @@ export class TableStage {
     r.shadowMap.enabled = high;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.1;
+    r.toneMappingExposure = this.o.exposure ?? 0.8;
     r.domElement.setAttribute('aria-label', '게임 테이블');
     this.container.prepend(r.domElement);
     this.renderer = r;
     this.sun.castShadow = high;
+    this.composer = null;
+    this.outlinesOn = !this.o.toon || high || this.o.outlineLow;
+    if (this.o.toon) {
+      // 카툰: 반사광·빛 번짐 없이 또렷하게. 그림자는 진하지 않고 경계가 분명하게
+      this.scene.environment = null;
+      r.toneMapping = THREE.NoToneMapping;
+      this.hemi.intensity = 1.25;
+      this.sun.intensity = 1.6;
+      this.sun.shadow.radius = 1;
+      r.shadowMap.type = THREE.PCFShadowMap;
+      this.setOutlines(this.outlinesOn);
+    } else {
+      // 환경 조명(실내 반사광): 한 번 구워 두고 모든 재질이 은은하게 반사 — 낮음에서도 비용 거의 없음
+      const pmrem = new THREE.PMREMGenerator(r);
+      this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+      this.hemi.intensity = 0.25;
+      this.sun.intensity = 1.1;
+    }
+    // 후처리(높음만, 카툰은 끔): 밝은 곳이 살짝 번지는 빛 + 색 보정 출력
+    if (high && !this.o.toon) {
+      this.composer = new EffectComposer(r);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), this.o.bloom ?? 0.18, 0.4, 0.95);
+      this.composer.addPass(this.bloom);
+      this.composer.addPass(new OutputPass());
+    }
     anisotropy = high ? Math.min(8, r.capabilities.getMaxAnisotropy()) : 2;
     this.resize();
     r.setAnimationLoop(() => this.loop());
@@ -129,6 +197,7 @@ export class TableStage {
     const w = this.container.clientWidth || innerWidth;
     const h = this.container.clientHeight || innerHeight;
     this.renderer.setSize(w, h);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     const a = this.camera.aspect;
@@ -137,6 +206,13 @@ export class TableStage {
       // 세로 화면: 좁을수록 멀리
       const k = Math.min(2.2, 0.6 / a + 0.4);
       this.camBase = new THREE.Vector3(c.port[0], c.port[1] * k, c.port[2] * k);
+      // fitWidth: 이 너비(월드 단위)가 좁은 세로 화면에서도 가로로 다 보이도록 카메라를 뒤로 뺌
+      if (this.o.fitWidth) {
+        const hHalf = Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * a);
+        const need = this.o.fitWidth / 2 / Math.tan(hHalf);
+        const len = this.camBase.length();
+        if (need > len) this.camBase.multiplyScalar(need / len);
+      }
       this.camTarget = new THREE.Vector3(...(c.portTarget || c.target || [0, 0, 0]));
     } else {
       const k = a < 1.4 ? 1.12 : 1;
@@ -153,10 +229,13 @@ export class TableStage {
   buildWorld() {
     const s = this.scene;
     const o = this.o;
-    s.add(new THREE.HemisphereLight(0xfff4e0, 0x302820, 0.9));
+    this.hemi = new THREE.HemisphereLight(0xfff4e0, 0x302820, 0.9);
+    s.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xfff1d6, 1.4);
     sun.position.set(-5, 14, 6);
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 4;
+    sun.shadow.normalBias = 0.02;
     Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 2, far: 40 });
     sun.shadow.bias = -0.0005;
     s.add(sun);
@@ -165,14 +244,14 @@ export class TableStage {
     const D = o.tableD || 8;
     const felt = canvasTexture(null, o.drawFelt, 1024, Math.round((1024 * D) / W));
     const top = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, D), [
-      ...Array(2).fill(new THREE.MeshStandardMaterial({ color: o.rim || 0x5a3820, roughness: 0.6 })),
-      new THREE.MeshStandardMaterial({ map: felt, roughness: 0.95 }),
-      ...Array(3).fill(new THREE.MeshStandardMaterial({ color: o.rim || 0x5a3820, roughness: 0.6 })),
+      ...Array(2).fill((o.toon ? toonMat(o.rim || 0x5a3820) : new THREE.MeshStandardMaterial({ color: o.rim || 0x5a3820, roughness: 0.6 }))),
+      (o.toon ? toonMat(0xffffff, { map: felt }) : new THREE.MeshStandardMaterial({ map: felt, roughness: 0.95 })),
+      ...Array(3).fill((o.toon ? toonMat(o.rim || 0x5a3820) : new THREE.MeshStandardMaterial({ color: o.rim || 0x5a3820, roughness: 0.6 }))),
     ]);
     top.position.y = -0.15;
     top.receiveShadow = true;
     s.add(top);
-    const rimMat = new THREE.MeshStandardMaterial({ color: o.rim || 0x5a3820, roughness: 0.45, metalness: 0.05 });
+    const rimMat = o.toon ? toonMat(o.rim || 0x5a3820) : new THREE.MeshStandardMaterial({ color: o.rim || 0x5a3820, roughness: 0.45, metalness: 0.05 });
     const rimT = 0.45;
     [
       [W + rimT * 2, rimT, 0, -(D / 2 + rimT / 2)],
@@ -186,7 +265,7 @@ export class TableStage {
       m.receiveShadow = true;
       s.add(m);
     });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: o.floor || 0x2a1d14, roughness: 1 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), (o.toon ? toonMat(o.floor || 0x2a1d14) : new THREE.MeshStandardMaterial({ color: o.floor || 0x2a1d14, roughness: 1 })));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -3;
     s.add(floor);
@@ -269,7 +348,8 @@ export class TableStage {
       }
       cam.lookAt(this.camTarget);
     }
-    this.renderer.render(this.scene, cam);
+    if (this.composer) this.composer.render(dt);
+    else this.renderer.render(this.scene, cam);
   }
 
   /** 테스트용: 화면이 숨겨져 rAF가 멈춰도 강제로 그림 */
@@ -278,6 +358,14 @@ export class TableStage {
     this.clock.getDelta = () => dt;
     for (let i = 0; i < n; i++) this.loop();
     this.clock.getDelta = g;
+  }
+
+  /** 카툰 외곽선 켜고 끄기 (낮음 품질에서는 끔) */
+  setOutlines(on) {
+    this.outlinesOn = on;
+    this.scene.traverse((m) => {
+      if (m.userData.outline) m.visible = on;
+    });
   }
 
   clear() {

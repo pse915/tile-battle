@@ -1,6 +1,6 @@
 /* 컬러 러시 — 칠판 교실 + 형광펜 */
 :root {
-  --theme-bg: #14211d;
+  --theme-bg: #fbe9c6;
   --accent: #7ff0d2;
   --title-stroke: #ff5ca8;
 }
@@ -16,7 +16,7 @@
   display: flex; align-items: center; gap: 8px;
   padding: 5px 12px 5px 6px; border-radius: 999px;
   background: rgba(255,255,255,.95); border: 3px solid var(--cc, #fff);
-  box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  box-shadow: 0 3px 0 #1f3550;
   font-family: var(--display); font-size: 1rem; white-space: nowrap;
 }
 .cr-chip.small { padding: 3px 10px; font-size: 0.85rem; border-color: transparent; }
@@ -73,3 +73,9 @@
   .cr-chip .dot img { width: 16px; height: 16px; }
   .k-actions .btn { padding: 6px 10px; font-size: 0.92rem; }
 }
+
+/* 카툰 테마: 밝은 교실 벽에서도 글씨가 또렷하게 */
+#hud .hud-round { color: #1f3550; text-shadow: 0 1px 0 #fff, 0 0 6px #fff; }
+.cr-chip { border-width: 3px; outline: 2px solid #1f3550; }
+.cr-chip.small { border-color: transparent; }
+.cr-tut-cards img { box-shadow: 0 2px 0 #1f3550; }

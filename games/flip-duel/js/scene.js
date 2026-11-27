@@ -1,5 +1,5 @@
 // 흑백 뒤집기 대전 3D: 나무 테이블 위 초록 판, 앞뒤 색이 다른 돌, 둘 수 있는 칸 표시, 뒤집기 연출
-import { TableStage, THREE, canvasTexture } from '../../../shared/table3d.js';
+import { TableStage, THREE, canvasTexture, toonMat, addOutline } from '../../../shared/table3d.js';
 import { tween, ease, wait } from '../../../shared/anim.js';
 
 const CELL = 0.9;
@@ -11,14 +11,14 @@ export const cellPos = (i) => new THREE.Vector3((((i % 8) - 3.5) * CELL), 0.12 +
 
 function drawFelt(ctx, w, h) {
   const g = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, w * 0.7);
-  g.addColorStop(0, '#6b4a2f');
-  g.addColorStop(1, '#3d2716');
+  g.addColorStop(0, '#f2c58f');
+  g.addColorStop(1, '#dea36a');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   // 나뭇결
   ctx.globalAlpha = 0.12;
   for (let i = 0; i < 70; i++) {
-    ctx.strokeStyle = i % 2 ? '#24140a' : '#8a6340';
+    ctx.strokeStyle = i % 2 ? '#b97c45' : '#ffe0b5';
     ctx.lineWidth = 1 + Math.random() * 3;
     ctx.beginPath();
     const y = Math.random() * h;
@@ -30,16 +30,17 @@ function drawFelt(ctx, w, h) {
 }
 
 function drawBoard(ctx, w) {
-  ctx.fillStyle = '#1f6b46';
+  ctx.fillStyle = '#3e9c6b';
   ctx.fillRect(0, 0, w, w);
   const m = w * 0.04;
   const s = (w - m * 2) / 8;
   for (let r = 0; r < 8; r++)
     for (let c = 0; c < 8; c++) {
-      ctx.fillStyle = (r + c) % 2 ? '#22774e' : '#25804f';
+      ctx.fillStyle = (r + c) % 2 ? '#8fd9a6' : '#9ee3b3';
       ctx.fillRect(m + c * s, m + r * s, s, s);
     }
-  ctx.strokeStyle = '#0d3a24';
+  ctx.strokeStyle = '#2f6b52';
+  ctx.lineWidth = 6;
   ctx.lineWidth = 4;
   for (let i = 0; i <= 8; i++) {
     ctx.beginPath();
@@ -49,7 +50,7 @@ function drawBoard(ctx, w) {
     ctx.lineTo(w - m, m + i * s);
     ctx.stroke();
   }
-  ctx.fillStyle = '#0d3a24';
+  ctx.fillStyle = '#2f6b52';
   [
     [2, 2],
     [2, 6],
@@ -60,7 +61,7 @@ function drawBoard(ctx, w) {
     ctx.arc(m + x * s, m + y * s, 8, 0, Math.PI * 2);
     ctx.fill();
   });
-  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.fillStyle = '#ffffff';
   ctx.font = `${Math.round(m * 0.7)}px Jua, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -73,9 +74,11 @@ function drawBoard(ctx, w) {
 export class FlipStage {
   constructor(container) {
     this.stage = new TableStage(container, {
-      bg: 0x17110c,
-      floor: 0x1b130d,
-      rim: 0x4a2c17,
+      bg: 0xbfe3f2,
+      floor: 0xa9d4e6,
+      rim: 0xc98a52,
+      toon: true,
+      fitWidth: 8.8,
       tableW: 12.5,
       tableD: 10,
       drawFelt,
@@ -99,14 +102,18 @@ export class FlipStage {
   build() {
     const g = this.s.group;
     const tex = canvasTexture('fd-board', (ctx, w) => drawBoard(ctx, w), 1024, 1024);
-    const frame = new THREE.MeshStandardMaterial({ color: 0x2b1a0e, roughness: 0.5 });
-    const board = new THREE.Mesh(new THREE.BoxGeometry(BOARD + 0.6, 0.24, BOARD + 0.6), [frame, frame, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }), frame, frame, frame]);
+    const frame = toonMat(0x3e9c6b);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(BOARD + 0.6, 0.24, BOARD + 0.6), [frame, frame, toonMat(0xffffff, { map: tex }), frame, frame, frame]);
+    addOutline(board, { color: 0x24493a, thickness: 0.05 });
     board.receiveShadow = true;
     board.castShadow = true;
     g.add(board);
     // 돌 재질
-    this.matBlack = new THREE.MeshStandardMaterial({ color: 0x1a1a1f, roughness: 0.35, metalness: 0.1 });
-    this.matWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.4 });
+    // 돌: 코팅된 플라스틱 느낌 (환경 반사 + 윤기)
+    this.matBlack = toonMat(0x2d2f4a);
+    this.matWhite = toonMat(0xfff7e6);
+    this.outlineMat = new THREE.MeshBasicMaterial({ color: 0x1d1a33, side: THREE.BackSide });
+    this.discOutlineGeo = new THREE.CylinderGeometry(DISC_R + 0.035, DISC_R + 0.035, DISC_H + 0.05, 40);
     this.discGeo = new THREE.CylinderGeometry(DISC_R, DISC_R, DISC_H / 2, 40);
     // 칸 고르기용 투명 판
     const pickMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
@@ -121,8 +128,8 @@ export class FlipStage {
       this.cells.push(m);
     }
     // 둘 수 있는 칸 표시
-    this.hintMat = new THREE.MeshBasicMaterial({ color: 0xffe36a, transparent: true, opacity: 0.7, depthWrite: false });
-    this.hintGeo = new THREE.RingGeometry(0.14, 0.22, 32);
+    this.hintMat = new THREE.MeshBasicMaterial({ color: 0xff8a5c, transparent: true, opacity: 0.7, depthWrite: false });
+    this.hintGeo = new THREE.RingGeometry(0.16, 0.27, 32);
     this.hints = [];
     this.hoverRing = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.4, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
     this.hoverRing.rotation.x = -Math.PI / 2;
@@ -135,7 +142,7 @@ export class FlipStage {
     g.add(this.lastMark);
     // 돌 통 두 개 (장식)
     [-1, 1].forEach((side) => {
-      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.7, 0.55, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.5, side: THREE.DoubleSide }));
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.7, 0.55, 32, 1, true), toonMat(0xf28c8c, { side: THREE.DoubleSide }));
       bowl.position.set(side * 5.1, 0.27, side * 2.6);
       bowl.castShadow = true;
       g.add(bowl);
@@ -149,12 +156,17 @@ export class FlipStage {
     let t = 0;
     this.s.frame.add((dt) => {
       t += dt;
-      this.hintMat.opacity = 0.45 + Math.sin(t * 4) * 0.25;
+      this.hintMat.opacity = 0.8 + Math.sin(t * 4) * 0.2;
     });
   }
 
   makeDisc(color) {
     const d = new THREE.Group();
+    const ol = new THREE.Mesh(this.discOutlineGeo, this.outlineMat);
+    ol.userData.outline = true;
+    ol.visible = this.s.outlinesOn !== false;
+    ol.raycast = () => {};
+    d.add(ol);
     const top = new THREE.Mesh(this.discGeo, this.matBlack);
     top.position.y = DISC_H / 4;
     const bot = new THREE.Mesh(this.discGeo, this.matWhite);
@@ -203,6 +215,7 @@ export class FlipStage {
       this.discs[idx] = d;
       await this.s.moveTo(d, { pos: to, duration: 0.32, lift: 0, easing: ease.inCubic });
       sfx?.place();
+      this.boing(d);
     }
     const center = cellPos(idx);
     const order = flips.slice().sort((a, b) => cellPos(a).distanceTo(center) - cellPos(b).distanceTo(center));
@@ -226,11 +239,25 @@ export class FlipStage {
           complete: () => {
             d.rotation.x = to;
             sfx?.flip(k);
+            this.boing(d, 0.6);
           },
         });
       }),
     );
     this.markLast(idx);
+  }
+
+  /** 통통 튀는 느낌: 납작해졌다가 살짝 커졌다가 원래대로 */
+  boing(d, amount = 1) {
+    return tween({
+      duration: 0.35,
+      ease: ease.linear,
+      update: (k) => {
+        const w = Math.sin(k * Math.PI * 2) * Math.exp(-k * 3) * 0.28 * amount;
+        d.scale.set(1 + w, 1 - w * 1.4, 1 + w);
+      },
+      complete: () => d.scale.set(1, 1, 1),
+    });
   }
 
   /** 둘 수 있는 칸 표시 */

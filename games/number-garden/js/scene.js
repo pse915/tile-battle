@@ -1,6 +1,6 @@
 // 숫자 블록 정원 3D: 학교 화단 테이블, 가운데 판(세트 줄), 자리마다 뒷면 타일 받침대, 뽑을 더미
-import { TableStage, THREE } from '../../../shared/table3d.js';
-import { ease, wait } from '../../../shared/anim.js';
+import { TableStage, THREE, toonMat, addOutline } from '../../../shared/table3d.js';
+import { ease, wait, tween } from '../../../shared/anim.js';
 import { tileMesh, backMesh, TILE_W, TILE_H, TILE_D } from './cards.js';
 import { kindOf, orderSet } from './rules.js';
 
@@ -13,58 +13,60 @@ const RACK_LEN = 5.4;
 const POOL_POS = new THREE.Vector3(-5.3, 0, 3.6);
 
 function drawFelt(ctx, w, h) {
-  // 잔디 바탕
-  ctx.fillStyle = '#4f8f3a';
+  // 카툰 잔디: 밝은 연두 바탕 + 큼직한 풀 무늬 몇 개
+  ctx.fillStyle = '#9ad86a';
   ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 2600; i++) {
-    ctx.strokeStyle = ['#5ea446', '#447f31', '#6db052', '#3c732c'][i % 4];
-    ctx.lineWidth = 1.5;
+  ctx.fillStyle = '#86c957';
+  for (let i = 0; i < 90; i++) {
     const x = Math.random() * w;
     const y = Math.random() * h;
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + (Math.random() - 0.5) * 6, y - 5 - Math.random() * 8);
-    ctx.stroke();
-  }
-  // 가운데 화단 흙
-  const m = w * 0.13;
-  const g = ctx.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, w * 0.5);
-  g.addColorStop(0, '#7a5232');
-  g.addColorStop(1, '#5c3b22');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(m, m * 0.62, w - m * 2, h - m * 1.24, 40) : ctx.rect(m, m * 0.62, w - m * 2, h - m * 1.24);
-  ctx.fill();
-  for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = i % 3 ? 'rgba(40,24,12,.35)' : 'rgba(190,150,110,.25)';
-    ctx.beginPath();
-    ctx.arc(m + Math.random() * (w - m * 2), m * 0.62 + Math.random() * (h - m * 1.24), 1 + Math.random() * 2.5, 0, Math.PI * 2);
+    ctx.moveTo(x - 7, y);
+    ctx.lineTo(x - 2, y - 16);
+    ctx.lineTo(x + 1, y - 3);
+    ctx.lineTo(x + 6, y - 13);
+    ctx.lineTo(x + 8, y);
+    ctx.closePath();
     ctx.fill();
   }
-  // 벽돌 테두리
-  ctx.strokeStyle = '#b8643f';
-  ctx.lineWidth = 14;
-  ctx.setLineDash([34, 6]);
-  ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(m, m * 0.62, w - m * 2, h - m * 1.24, 40) : ctx.rect(m, m * 0.62, w - m * 2, h - m * 1.24);
+  // 가운데 화단 흙 (단색 + 두꺼운 벽돌 테두리)
+  const m = w * 0.13;
+  const rr = () => {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(m, m * 0.62, w - m * 2, h - m * 1.24, 44);
+    else ctx.rect(m, m * 0.62, w - m * 2, h - m * 1.24);
+  };
+  ctx.fillStyle = '#c98f5f';
+  rr();
+  ctx.fill();
+  ctx.strokeStyle = '#3b2a4a';
+  ctx.lineWidth = 26;
+  rr();
+  ctx.stroke();
+  ctx.strokeStyle = '#ef8a5b';
+  ctx.lineWidth = 16;
+  ctx.setLineDash([40, 8]);
+  rr();
   ctx.stroke();
   ctx.setLineDash([]);
-  // 구석의 작은 꽃들
-  const flowers = ['#ff6b7a', '#ffd34d', '#6aa8ff', '#c08cff', '#fff'];
-  for (let i = 0; i < 70; i++) {
+  // 구석의 작은 꽃들 (외곽선 있는 단순한 꽃)
+  const flowers = ['#ff8d9a', '#ffd84d', '#7fb2ff', '#c9a2ff', '#ffffff'];
+  for (let i = 0; i < 46; i++) {
     const x = Math.random() * w;
     const y = Math.random() * h;
-    if (x > m - 10 && x < w - m + 10 && y > m * 0.62 - 10 && y < h - m * 0.62 + 10) continue;
-    ctx.fillStyle = flowers[i % flowers.length];
-    for (let k = 0; k < 5; k++) {
-      const a = (k * Math.PI * 2) / 5;
-      ctx.beginPath();
-      ctx.arc(x + Math.cos(a) * 4, y + Math.sin(a) * 4, 3.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = '#ffe58a';
+    if (x > m - 24 && x < w - m + 24 && y > m * 0.62 - 24 && y < h - m * 0.62 + 24) continue;
+    [['#3b2a4a', 5.4], [flowers[i % flowers.length], 4]].forEach(([col, rad]) => {
+      ctx.fillStyle = col;
+      for (let k = 0; k < 5; k++) {
+        const a = (k * Math.PI * 2) / 5;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(a) * 6, y + Math.sin(a) * 6, rad, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+    ctx.fillStyle = '#ffb627';
     ctx.beginPath();
-    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+    ctx.arc(x, y, 3.2, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -84,9 +86,11 @@ function seatSpot(rel, n) {
 export class GardenStage {
   constructor(container) {
     this.stage = new TableStage(container, {
-      bg: 0x1d2a1a,
-      floor: 0x22301d,
-      rim: 0x8a5a33,
+      bg: 0xcdeccf,
+      floor: 0xb5e0b4,
+      rim: 0xd9925a,
+      toon: true,
+      fitWidth: 14.6,
       tableW: TABLE_W,
       tableD: TABLE_D,
       drawFelt,
@@ -110,11 +114,37 @@ export class GardenStage {
     this.s.setTitleMode(on);
   }
 
+  /** 카툰 외곽선 (낮음 품질에서는 꺼 둠) */
+  outline(mesh, color = 0x2e2a52, thickness = 0.04) {
+    const o = addOutline(mesh, { color, thickness });
+    o.visible = this.s.outlinesOn !== false;
+    return mesh;
+  }
+
+  /** 타일 외곽선 (진한 남색) */
+  tileOutline(m) {
+    return this.outline(m, 0x2e2a52, 0.035);
+  }
+
+  /** 내려앉을 때 살짝 통통 (타일 앞면이 +z라 z가 높이 방향) */
+  boing(m, amount = 1) {
+    const base = m.scale.x;
+    return tween({
+      duration: 0.32,
+      ease: ease.linear,
+      update: (k) => {
+        const w = Math.sin(k * Math.PI * 2) * Math.exp(-k * 3) * 0.16 * amount;
+        m.scale.set(base * (1 + w), base * (1 + w), base * (1 - w * 1.3));
+      },
+      complete: () => m.scale.setScalar(base),
+    });
+  }
+
   decorate() {
     // 구석의 작은 화분 두 개 (분위기)
-    const pot = new THREE.MeshStandardMaterial({ color: 0xc0653a, roughness: 0.7 });
-    const leaf = new THREE.MeshStandardMaterial({ color: 0x4caf50, roughness: 0.6 });
-    const petals = [0xff6b7a, 0xffd34d, 0x6aa8ff, 0xc08cff];
+    const pot = toonMat(0xf08a5d);
+    const leaf = toonMat(0x5cc24f);
+    const petals = [0xff7a88, 0xffd84d, 0x7fb2ff, 0xc9a2ff];
     [
       [5.6, 3.7],
       [-5.6, -3.7],
@@ -122,12 +152,14 @@ export class GardenStage {
       const p = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.32, 0.6, 20), pot);
       p.position.set(x, 0.3, z);
       p.castShadow = true;
+      this.outline(p, 0x5a2e2a, 0.04);
       this.s.group.add(p);
       for (let i = 0; i < 3; i++) {
         const st = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), leaf);
         st.position.set(x + (i - 1) * 0.16, 0.85, z + (i % 2) * 0.1);
         this.s.group.add(st);
-        const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8), new THREE.MeshStandardMaterial({ color: petals[(i + k * 2) % 4], roughness: 0.5 }));
+        const fl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 10), toonMat(petals[(i + k * 2) % 4]));
+        this.outline(fl, 0x3b2a4a, 0.025);
         fl.position.set(st.position.x, 1.18, st.position.z);
         fl.castShadow = true;
         this.s.group.add(fl);
@@ -143,7 +175,7 @@ export class GardenStage {
     this.n = n;
     this.mySeat = mySeat;
     const base = mySeat >= 0 ? mySeat : 0;
-    const wood = new THREE.MeshStandardMaterial({ color: 0x9c6b3e, roughness: 0.55 });
+    const wood = toonMat(0xe0a46a);
     for (let seat = 0; seat < n; seat++) {
       const rel = (seat - base + n) % n;
       const sp = seatSpot(rel, n);
@@ -157,6 +189,8 @@ export class GardenStage {
       const lip = new THREE.Mesh(new THREE.BoxGeometry(RACK_LEN, 0.42, 0.12), wood);
       lip.position.set(0, 0.21, 0.24);
       lip.castShadow = true;
+      this.outline(bar, 0x5a3a2a, 0.035);
+      this.outline(lip, 0x5a3a2a, 0.035);
       group.add(bar, lip);
       this.s.group.add(group);
       this.racks.push({ group, tiles: [], seat, rel, count: 0, mine: seat === mySeat });
@@ -170,7 +204,7 @@ export class GardenStage {
       if (!r) return;
       const want = r.mine ? 0 : c;
       while (r.tiles.length < want) {
-        const m = backMesh();
+        const m = this.tileOutline(backMesh());
         m.scale.setScalar(0.5);
         r.group.add(m);
         r.tiles.push(m);
@@ -203,7 +237,7 @@ export class GardenStage {
     for (let i = 0; i < layers; i++) {
       for (let c = 0; c < 2; c++) {
         if (i === layers - 1 && c === 1 && count % 12 && count % 12 <= 6) continue;
-        const m = backMesh();
+        const m = this.tileOutline(backMesh());
         m.scale.setScalar(0.55);
         m.rotation.x = -Math.PI / 2;
         m.rotation.z = (Math.random() - 0.5) * 0.12;
@@ -264,7 +298,7 @@ export class GardenStage {
     for (const [id, to] of pos) {
       let m = this.tiles.get(id);
       if (!m) {
-        m = tileMesh(kindOf(id));
+        m = this.tileOutline(tileMesh(kindOf(id)));
         m.rotation.x = -Math.PI / 2;
         m.scale.setScalar(scale);
         this.s.group.add(m);
@@ -272,7 +306,8 @@ export class GardenStage {
         if (instant || fromSeat < 0) m.position.copy(to);
         else {
           m.position.copy(this.seatAnchor(fromSeat, 0.6));
-          jobs.push(this.s.moveTo(m, { pos: to, duration: 0.5, lift: 1.2, delay: 0.05 * k++, easing: ease.outCubic }));
+          const mm = m;
+          jobs.push(this.s.moveTo(m, { pos: to, duration: 0.5, lift: 1.2, delay: 0.05 * k++, easing: ease.outCubic }).then(() => this.boing(mm)));
         }
       } else if (m.position.distanceToSquared(to) > 1e-4) {
         if (instant) m.position.copy(to);
@@ -291,7 +326,7 @@ export class GardenStage {
 
   /** 더미에서 받침대로 한 장 날아가기 */
   async drawFly(seat) {
-    const m = backMesh();
+    const m = this.tileOutline(backMesh());
     m.scale.setScalar(0.55);
     m.rotation.x = -Math.PI / 2;
     m.position.copy(this.poolTop());
