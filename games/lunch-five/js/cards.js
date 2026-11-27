@@ -276,26 +276,7 @@ export function drawCard(g, code, w = W, h = H) {
   const st = menuSticker(menu, s);
   pts.forEach(([px, py]) => g.drawImage(st, px * w - st.width / 2, py * h - st.height / 2));
   // 모서리 개수 숫자 (위·아래 두 곳, 아래쪽은 거꾸로 — 어느 자리에서 봐도 읽힘)
-  const badge = (x, y, rot) => {
-    g.save();
-    g.translate(x, y);
-    g.rotate(rot);
-    g.fillStyle = '#ffffff';
-    g.strokeStyle = INK;
-    g.lineWidth = 5;
-    g.beginPath();
-    g.arc(0, 0, 24, 0, Math.PI * 2);
-    g.fill();
-    g.stroke();
-    g.fillStyle = INK;
-    g.font = `38px ${FONT}`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(n), 0, 2);
-    g.restore();
-  };
-  badge(36, 36, 0);
-  badge(w - 36, h - 36, Math.PI);
+  // 개수 숫자는 넣지 않음 — 그림을 직접 세는 게 이 게임의 재미
 }
 
 export function drawBack(g, w = W, h = H) {
