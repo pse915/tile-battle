@@ -22,6 +22,7 @@ const LIBS = [
   { file: 'games/code-breaker/js/rules.js', ns: 'CBRules' },
   { file: 'games/number-garden/js/rules.js', ns: 'NGRules' },
   { file: 'games/lunch-five/js/rules.js', ns: 'LFRules' },
+  { file: 'games/school-trip/js/rules.js', ns: 'STRules' },
 ];
 const MODULES = [
   'server/games/tile-battle.js',
@@ -31,6 +32,7 @@ const MODULES = [
   'server/games/code-breaker.js',
   'server/games/number-garden.js',
   'server/games/lunch-five.js',
+  'server/games/school-trip.js',
 ];
 
 function wrap({ file, ns }) {
