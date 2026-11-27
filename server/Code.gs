@@ -206,7 +206,9 @@ function createRoom(req) {
   if (!GAMES[game]) fail('알 수 없는 게임이에요.');
   let code = '';
   for (let i = 0; i < 30 && !code; i++) {
-    const c = String(Math.floor(1000 + Math.random() * 9000));
+    // 끝자리: 집 서버(ROOM_CODE_ODD)는 홀수, 앱스크립트는 짝수 → 클라이언트가 코드로 서버를 찾음
+    const odd = typeof ROOM_CODE_ODD !== 'undefined' && ROOM_CODE_ODD;
+    const c = String(Math.floor(100 + Math.random() * 900) * 10 + Math.floor(Math.random() * 5) * 2 + (odd ? 1 : 0));
     if (!loadRoom(c)) code = c;
   }
   if (!code) fail('지금은 방을 만들 수 없어요. 잠시 뒤 다시 해 보세요.');
