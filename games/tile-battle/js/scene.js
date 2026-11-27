@@ -1,5 +1,6 @@
 // Three.js 무대: 원목 테이블, 펠트, 조명, 카메라, 손패 배치, 타일 비행 연출
 import * as THREE from 'three';
+import { applyGfx } from '../../../shared/gfx.js';
 import { createTileMesh, createBackMesh, setAnisotropy, TILE_W, TILE_H, TILE_D } from './tiles.js';
 import { tween, updateTweens, ease, lerp } from '../../../shared/anim.js';
 import { makeTile, shuffle } from './rules.js';
@@ -61,10 +62,11 @@ export class Stage {
     r.shadowMap.enabled = high;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = 0.9;
     r.domElement.setAttribute('aria-label', '게임 테이블');
     this.container.prepend(r.domElement);
     this.renderer = r;
+    this.composer = applyGfx(r, this.scene, this.camera, { high, env: true, bloom: 0.18 });
     setAnisotropy(high ? Math.min(8, r.capabilities.getMaxAnisotropy()) : 1);
     this.sun.castShadow = high;
     this.resize();
@@ -76,6 +78,7 @@ export class Stage {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.placeCamera();
@@ -662,7 +665,8 @@ export class Stage {
     }
 
     for (const fn of this.frameCallbacks) fn(dt);
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 }
 

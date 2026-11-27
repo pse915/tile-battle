@@ -1,5 +1,6 @@
 // 밤바다 위 범선 갑판: 물결, 안개, 랜턴, 둥근 해도 테이블, 카드 줄, 열쇠, 연출
 import * as THREE from 'three';
+import { applyGfx } from '../../../shared/gfx.js';
 import { tween, updateTweens, ease, lerp } from '../../../shared/anim.js';
 import { createCardMesh, setCardFace, setAnisotropy, CARD_W, CARD_H, CARD_T } from './cards.js';
 
@@ -50,6 +51,7 @@ export class SeaStage {
     r.domElement.setAttribute('aria-label', '게임 테이블');
     this.container.prepend(r.domElement);
     this.renderer = r;
+    this.composer = applyGfx(r, this.scene, this.camera, { high, env: false, bloom: 0.45 });
     this.moon.castShadow = high;
     setAnisotropy(high ? Math.min(8, r.capabilities.getMaxAnisotropy()) : 1);
     this.waveDetail = high ? 1 : 0.5;
@@ -62,6 +64,7 @@ export class SeaStage {
     const w = this.container.clientWidth || innerWidth;
     const h = this.container.clientHeight || innerHeight;
     this.renderer.setSize(w, h);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     const a = this.camera.aspect;
@@ -540,7 +543,8 @@ export class SeaStage {
     }
 
     for (const fn of this.frameCallbacks) fn(dt);
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 }
 
