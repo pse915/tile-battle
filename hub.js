@@ -2,7 +2,7 @@
 import { api, onlineReady } from './shared/net.js';
 import { $, toast } from './shared/ui-core.js';
 
-const GAMES = ['tile-battle', 'deep-sea', 'flip-duel', 'color-rush', 'code-breaker', 'number-garden', 'lunch-five', 'school-trip'];
+const GAMES = ['tile-battle', 'deep-sea', 'flip-duel', 'color-rush', 'code-breaker', 'number-garden', 'lunch-five', 'school-trip', 'one-card'];
 const GAME_PATH = Object.fromEntries(GAMES.map((g) => [g, `./games/${g}/`]));
 const keep = () => {
   // 개발용 ?api= 값은 이동할 때도 유지
