@@ -1,10 +1,8 @@
 // 흑백 뒤집기 대전 — 시작, 메뉴, 모드 연결
 import { createShell, bootFailed } from '../../../shared/shell.js';
-import { ensureFonts } from '../../../shared/table3d.js';
 import { Lobby } from '../../../shared/lobby.js';
 import { common } from '../../../shared/storage.js';
 import * as ui from '../../../shared/ui-core.js';
-import { FlipStage } from './scene.js';
 import { FlipGame } from './game.js';
 import { audio } from './audio.js';
 import { startTutorial } from './tutorial.js';
@@ -68,6 +66,10 @@ async function boot() {
     const r = runSelfTests();
     setTimeout(() => ui.toast(`자가 테스트 ${r.passed}/${r.total} 통과`, 4000), 1500);
   }
+  // 3D 엔진: 기본 Babylon.js, 비교용으로 ?engine=three 이면 예전 Three.js 장면
+  const useThree = new URLSearchParams(location.search).get('engine') === 'three';
+  const { FlipStage } = await import(useThree ? './scene.js' : './scene-babylon.js');
+  const { ensureFonts } = await import(useThree ? '../../../shared/table3d.js' : '../../../shared/stage-babylon.js');
   await ensureFonts();
   view = new FlipStage(document.getElementById('stage'));
   view.setQuality(shell.quality());
