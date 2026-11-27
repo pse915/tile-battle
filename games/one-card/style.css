@@ -1,0 +1,115 @@
+/* 원카드 — 청록 펠트 카드 테이블, 빨강·검정 무늬 */
+:root {
+  --theme-bg: #ffe9d2;
+  --accent: #ffd84d;
+  --title-stroke: #e2384d;
+}
+.title { text-shadow: 6px 6px 0 rgba(47, 143, 134, 0.55), -4px -3px 0 rgba(226, 56, 77, 0.4); }
+
+/* 위쪽: 지금 무늬 · 방향 */
+.oc-top {
+  position: absolute; top: calc(62px + var(--safe-t)); left: 10px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  pointer-events: none !important;
+}
+.oc-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 6px; border-radius: 999px;
+  background: rgba(255,255,255,.96); border: 3px solid #1f2a3a; outline: 2px solid #1f3550;
+  box-shadow: 0 3px 0 #1f3550;
+  font-family: var(--display); font-size: 1rem; white-space: nowrap; color: #1f2a3a;
+}
+.oc-chip[data-red="1"] { border-color: #e2384d; }
+.oc-chip b.red { color: #e2384d; }
+.oc-chip.small { padding: 3px 10px; font-size: 0.85rem; border-color: transparent; }
+.oc-chip .dot { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; background: #fffaf0; box-shadow: inset 0 -3px 0 rgba(0,0,0,.15); }
+.oc-chip .dot img { width: 24px; height: 24px; }
+
+/* 쌓인 공격 */
+.oc-attack {
+  position: absolute; top: calc(30% + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  padding: 6px 18px; border-radius: 16px;
+  background: #e2384d; color: #fff; border: 4px solid #1f3550; box-shadow: 0 5px 0 #1f3550;
+  font-family: var(--display); font-size: 1.4rem; white-space: nowrap;
+  pointer-events: none !important; text-shadow: 0 2px 0 #7a1020;
+  animation: ocpulse .8s ease-in-out infinite;
+}
+.oc-attack b { font-size: 2.4rem; vertical-align: -4px; margin-right: 4px; color: #ffe36a; }
+.oc-attack.pop { animation: ocpop .35s cubic-bezier(.2, 1.6, .4, 1), ocpulse .8s .35s ease-in-out infinite; }
+@keyframes ocpop { from { transform: translateX(-50%) scale(1.8) rotate(-6deg); } to { transform: translateX(-50%) scale(1); } }
+@keyframes ocpulse { 50% { transform: translateX(-50%) scale(1.06); } }
+
+/* 안내 깃발 */
+.oc-flag { bottom: calc(196px + var(--safe-b)); }
+.oc-flag.mine { background: #ffd84d; }
+.oc-flag.danger { background: #ffb3bd; }
+
+/* 아래 손패 */
+.oc-bottom { gap: 4px; }
+.oc-bottom .k-hand { padding-top: 18px; }
+.k-card.ok { box-shadow: 0 0 0 4px #4fd06a, 0 6px 12px rgba(0,0,0,.45); transform: translateY(-6px); }
+.k-card.ok.sel { transform: translateY(-14px); }
+.k-card.dim { opacity: .5; filter: saturate(.6); }
+.oc-last { background: #e2384d; color: #fff; border-color: #6a1020; box-shadow: 0 3px 0 #6a1020; }
+.oc-last.is-armed { background: #ffe36a; color: var(--ink); }
+.oc-last.pulse, .oc-catch { animation: ocbtn .7s ease-in-out infinite; }
+.oc-catch { background: #ff9a2e; color: #fff; border-color: #6b3300; box-shadow: 0 3px 0 #6b3300; }
+.oc-take { border-color: #7a1020; }
+@keyframes ocbtn { 50% { transform: scale(1.07); } }
+
+/* 이름표 */
+.seat-label.danger { background: #fff1f3; }
+.seat-label.danger .meta { color: #c2183b; font-weight: 600; }
+.seat-label.out { opacity: .7; filter: grayscale(.5); }
+.seat-label[hidden] { display: none; }
+
+/* 무늬 고르기 */
+.oc-swatches .btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fffaf0; color: #1f2a3a; border: 3px solid #1f2a3a; font-size: 1.1rem;
+}
+.oc-swatches .btn.red { color: #e2384d; border-color: #e2384d; }
+.oc-swatches .btn img { width: 44px; height: 44px; }
+.oc-swatches .btn span { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+.oc-swatches .btn small { font-family: var(--body); font-size: 0.75rem; color: #555; }
+
+/* 한 기기: 가림막 */
+.oc-cover {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px;
+  background: #2f8f86 repeating-linear-gradient(45deg, rgba(255,255,255,.06) 0 20px, transparent 20px 40px);
+  pointer-events: auto !important;
+}
+.oc-cover[hidden] { display: none; }
+.oc-cover-box {
+  max-width: 340px; width: 100%; text-align: center; display: grid; gap: 12px;
+  background: #fffaf0; border: 4px solid #1f3550; border-radius: 20px; padding: 20px 16px; box-shadow: 0 6px 0 #1f3550;
+}
+.oc-cover-box h2 { margin: 0; font-family: var(--display); }
+.oc-cover-box p { margin: 0; }
+.oc-cover-box .big { font-size: 3rem; }
+
+/* 대기방 옵션 */
+.oc-opts .bot-row { flex-wrap: wrap; }
+.oc-opts .field { margin-bottom: 6px; }
+
+/* 결과 */
+.oc-result { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 6px; }
+.oc-result li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(29,43,79,.06); font-family: var(--display); }
+.oc-result li.win { background: #fff6c8; border: 2px solid var(--hl); }
+
+/* 튜토리얼 · 규칙 카드 그림 */
+.oc-tut-cards { display: flex; gap: 6px; flex-wrap: wrap; }
+.oc-tut-cards img { width: 44px; border-radius: 6px; box-shadow: 0 2px 0 #1f3550; }
+.rules-body img { width: 26px; vertical-align: middle; }
+
+@media (max-width: 560px) {
+  .oc-flag { bottom: calc(166px + var(--safe-b)); }
+  .oc-chip { font-size: 0.86rem; padding: 3px 10px 3px 4px; }
+  .oc-chip .dot { width: 24px; height: 24px; }
+  .oc-chip .dot img { width: 19px; height: 19px; }
+  .oc-attack { font-size: 1.1rem; top: calc(62% + var(--safe-t)); } /* 세로 화면: 위쪽 자리를 가리지 않게 더미 아래로 */
+  .oc-attack b { font-size: 1.9rem; }
+  .k-actions .btn { padding: 6px 10px; font-size: 0.92rem; }
+}
+
+#hud .hud-round { color: #1f3550; text-shadow: 0 1px 0 #fff, 0 0 6px #fff; }

@@ -23,6 +23,7 @@ const LIBS = [
   { file: 'games/number-garden/js/rules.js', ns: 'NGRules' },
   { file: 'games/lunch-five/js/rules.js', ns: 'LFRules' },
   { file: 'games/school-trip/js/rules.js', ns: 'STRules' },
+  { file: 'games/one-card/js/rules.js', ns: 'OCRules' },
 ];
 const MODULES = [
   'server/games/tile-battle.js',
@@ -33,6 +34,7 @@ const MODULES = [
   'server/games/number-garden.js',
   'server/games/lunch-five.js',
   'server/games/school-trip.js',
+  'server/games/one-card.js',
 ];
 
 function wrap({ file, ns }) {
