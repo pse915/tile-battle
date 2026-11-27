@@ -1,6 +1,6 @@
 /* 흑백 뒤집기 대전 — 보드게임 카페의 나무 테이블 */
 :root {
-  --theme-bg: #17110c;
+  --theme-bg: #bfe3f2;
   --accent: #ffe36a;
   --title-stroke: #1f6b46;
 }
@@ -27,3 +27,6 @@
   .fd-chip { padding: 4px 10px 4px 6px; font-size: 0.86rem; }
   .fd-chip b { font-size: 1.1rem; }
 }
+/* 카툰 테마: 밝은 배경에서도 위쪽 글씨가 또렷하게 */
+#hud .hud-round { color: #2d2f4a; text-shadow: 0 1px 0 #fff, 0 0 6px #fff; }
+.fd-chip { border-color: #2d2f4a33; }
