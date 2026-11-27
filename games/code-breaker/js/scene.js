@@ -1,57 +1,55 @@
 // 비밀번호 해독반 3D: 밤의 동아리방 책상 위, 자리마다 서 있는 숫자 블록 줄 + 가운데 흩어진 뒷면 더미
 // 서 있는 타일의 앞면(+z)은 주인을 향함 → 남의 줄은 뒷면 색만 보임. 공개된 타일은 앞으로 눕혀 숫자가 보이게.
-import { TableStage, THREE, canvasTexture } from '../../../shared/table3d.js';
+import { TableStage, THREE, canvasTexture, toonMat, addOutline } from '../../../shared/table3d.js';
 import { tween, ease, wait } from '../../../shared/anim.js';
 import { frontTex, backTex } from './cards.js';
 
 export const W = 0.62;
 export const H = 0.88;
 export const D = 0.24;
-const SIDE = { b: 0x1d1f27, w: 0xeee8d8 };
+const SIDE = { b: 0x34345e, w: 0xfff6dc };
+const OUTLINE = { b: 0x141230, w: 0x22203f };
 
 function drawFelt(ctx, w, h) {
-  const g = ctx.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, w * 0.7);
-  g.addColorStop(0, '#1d4a4a');
-  g.addColorStop(1, '#0c2128');
-  ctx.fillStyle = g;
+  // 카툰 칠판: 민트빛 단색 + 굵은 모눈 + 분필 낙서 몇 개
+  ctx.fillStyle = '#4fa894';
   ctx.fillRect(0, 0, w, h);
-  // 모눈종이 줄
-  ctx.strokeStyle = 'rgba(160,255,230,.06)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < w; x += 32) {
+  ctx.strokeStyle = 'rgba(255,255,255,.12)';
+  ctx.lineWidth = 3;
+  for (let x = 0; x < w; x += 64) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, h);
     ctx.stroke();
   }
-  for (let y = 0; y < h; y += 32) {
+  for (let y = 0; y < h; y += 64) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(w, y);
     ctx.stroke();
   }
-  // 분필로 끄적인 숫자·기호
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const marks = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '?', '<', '>', '=', '★'];
-  for (let i = 0; i < 46; i++) {
+  const marks = ['1', '2', '3', '7', '?', '<', '>', '★'];
+  for (let i = 0; i < 16; i++) {
     ctx.save();
     ctx.translate(Math.random() * w, Math.random() * h);
-    ctx.rotate((Math.random() - 0.5) * 1.2);
-    ctx.fillStyle = `rgba(230,255,245,${0.04 + Math.random() * 0.05})`;
-    ctx.font = `${18 + Math.random() * 34}px Jua, sans-serif`;
+    ctx.rotate((Math.random() - 0.5) * 0.8);
+    ctx.fillStyle = 'rgba(255,255,240,.16)';
+    ctx.font = `${30 + Math.random() * 26}px Jua, sans-serif`;
     ctx.fillText(marks[i % marks.length], 0, 0);
     ctx.restore();
   }
-  // 가운데 다이얼 원 (더미 자리)
-  ctx.strokeStyle = 'rgba(111,240,200,.18)';
-  ctx.lineWidth = 4;
+  // 가운데 더미 자리: 굵은 크림색 원
+  ctx.fillStyle = 'rgba(255,246,220,.18)';
   ctx.beginPath();
-  ctx.arc(w / 2, h / 2, w * 0.13, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([6, 10]);
+  ctx.arc(w / 2, h / 2, w * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,246,220,.55)';
+  ctx.lineWidth = 8;
+  ctx.setLineDash([18, 14]);
   ctx.beginPath();
-  ctx.arc(w / 2, h / 2, w * 0.155, 0, Math.PI * 2);
+  ctx.arc(w / 2, h / 2, w * 0.15, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
 }
@@ -67,9 +65,11 @@ const ANGLES = {
 export class CodeStage {
   constructor(container) {
     this.s = new TableStage(container, {
-      bg: 0x0b0f1a,
-      floor: 0x0a0d16,
-      rim: 0x2b2238,
+      bg: 0x8e97e3,
+      floor: 0x7a83d2,
+      rim: 0xe89a6c,
+      toon: true,
+      fitWidth: 11,
       tableW: 14,
       tableD: 10.6,
       drawFelt,
@@ -84,7 +84,7 @@ export class CodeStage {
     this.onTile = null;
     this.onPile = null;
     this.geo = new THREE.BoxGeometry(W, H, D);
-    this.sideMat = { b: new THREE.MeshStandardMaterial({ color: SIDE.b, roughness: 0.5 }), w: new THREE.MeshStandardMaterial({ color: SIDE.w, roughness: 0.55 }) };
+    this.sideMat = { b: toonMat(SIDE.b), w: toonMat(SIDE.w) };
     this.s.onPick = (d) => {
       if (d.pile) this.onPile?.(d.pile);
       else if (d.tile) this.onTile?.(d.seat, d.tile);
@@ -96,7 +96,7 @@ export class CodeStage {
       t += dt;
       const sel = this.tiles.get(this.selected);
       if (sel) sel.box.material.forEach((m) => m.emissive && m.emissive.setHex(0x1b6b55).multiplyScalar(0.6 + Math.sin(t * 5) * 0.4));
-      if (this.lamp) this.lamp.intensity = 1.6 + Math.sin(t * 1.3) * 0.08;
+      if (this.lamp) this.lamp.intensity = 0.5 + Math.sin(t * 1.3) * 0.04;
     });
   }
 
@@ -110,15 +110,15 @@ export class CodeStage {
   buildDecor() {
     const g = this.s.group;
     // 책상 스탠드 불빛 (초록빛 도는 동아리방)
-    this.lamp = new THREE.PointLight(0x9fffe0, 1.6, 22, 1.6);
+    this.lamp = new THREE.PointLight(0xfff0d0, 0.5, 22, 1.6);
     this.lamp.position.set(0, 6, 0);
     this.s.scene.add(this.lamp);
     // 장식: 구석의 노트와 연필
     const note = new THREE.Mesh(
       new THREE.BoxGeometry(2.1, 0.06, 2.8),
-      new THREE.MeshStandardMaterial({
+      toonMat(0xffffff, {
         map: canvasTexture('cb-note', (ctx, w, h) => {
-          ctx.fillStyle = '#f1ead6';
+          ctx.fillStyle = '#fff6dc';
           ctx.fillRect(0, 0, w, h);
           ctx.strokeStyle = '#9db8d8';
           ctx.lineWidth = 2;
@@ -132,14 +132,15 @@ export class CodeStage {
           ctx.font = '26px Jua, sans-serif';
           ['암호 메모', '검? < 흰3 < 검?', '? = 4 아니면 5', '★ 조커 조심'].forEach((l, i) => ctx.fillText(l, 22, 64 + i * 52));
         }, 256, 340),
-        roughness: 0.9,
       }),
     );
+    addOutline(note, { color: 0x22203f, thickness: 0.04 });
     note.position.set(-5.6, 0.03, -3.9);
     note.rotation.y = 0.35;
     note.receiveShadow = true;
     g.add(note);
-    const pencil = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0xf2c14e, roughness: 0.6 }));
+    const pencil = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 6), toonMat(0xffc94d));
+    addOutline(pencil, { color: 0x22203f, thickness: 0.03 });
     pencil.rotation.z = Math.PI / 2;
     pencil.rotation.y = -0.6;
     pencil.position.set(-4.7, 0.07, -2.4);
@@ -185,14 +186,16 @@ export class CodeStage {
   }
 
   makeTile(c) {
-    const front = new THREE.MeshStandardMaterial({ map: frontTex(c, null), roughness: 0.45, emissive: 0x000000 });
-    const back = new THREE.MeshStandardMaterial({ map: backTex(c), roughness: 0.5, emissive: 0x000000 });
+    const front = toonMat(0xffffff, { map: frontTex(c, null) });
+    const back = toonMat(0xffffff, { map: backTex(c) });
     const side = this.sideMat[c].clone();
     side.emissive = new THREE.Color(0);
     // BoxGeometry 면 순서: +x, -x, +y, -y, +z(앞), -z(뒤)
     const box = new THREE.Mesh(this.geo, [side, side, side, side, front, back]);
     box.castShadow = true;
     box.receiveShadow = true;
+    const ol = addOutline(box, { color: OUTLINE[c], thickness: 0.035 });
+    ol.visible = this.s.outlinesOn !== false;
     const g = new THREE.Group();
     g.rotation.order = 'YXZ';
     g.add(box);
@@ -292,7 +295,7 @@ export class CodeStage {
           if (opts.instant) {
             p.copy(target.pos);
             t.g.rotation.set(target.rotX, target.rotY, target.rotZ);
-          } else moves.push(this.s.moveTo(t.g, { ...target, duration: flip ? 0.55 : 0.45, lift: flip ? 0.9 : 0.5 }));
+          } else moves.push(this.s.moveTo(t.g, { ...target, duration: flip ? 0.55 : 0.45, lift: flip ? 0.9 : 0.5 }).then(() => this.boing(t, flip ? 1 : 0.6)));
         }
         t.box.material[4].emissive.setHex(tile.id === cb.fresh && seat === me ? 0x0f3b30 : 0);
       });
@@ -307,6 +310,21 @@ export class CodeStage {
     this.setPile(pc);
     if (!this.tiles.has(this.selected)) this.selected = 0;
     return Promise.all(moves);
+  }
+
+  /** 내려앉을 때 살짝 통통 */
+  boing(t, amount = 1) {
+    const o = t.box;
+    return tween({
+      duration: 0.32,
+      ease: ease.linear,
+      update: (k) => {
+        const w = Math.sin(k * Math.PI * 2) * Math.exp(-k * 3) * 0.16 * amount;
+        if (t.up) o.scale.set(1 + w, 1 + w, 1 - w * 1.3);
+        else o.scale.set(1 + w, 1 - w * 1.3, 1 + w);
+      },
+      complete: () => o.scale.set(1, 1, 1),
+    });
   }
 
   relayout() {

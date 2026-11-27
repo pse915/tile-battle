@@ -1,7 +1,8 @@
 // Three.js 무대: 원목 테이블, 펠트, 조명, 카메라, 손패 배치, 타일 비행 연출
 import * as THREE from 'three';
 import { applyGfx } from '../../../shared/gfx.js';
-import { createTileMesh, createBackMesh, setAnisotropy, TILE_W, TILE_H, TILE_D } from './tiles.js';
+import { toonMat, addOutline } from '../../../shared/table3d.js';
+import { createTileMesh, createBackMesh, setAnisotropy, setTileOutlines, TILE_W, TILE_H, TILE_D } from './tiles.js';
 import { tween, updateTweens, ease, lerp } from '../../../shared/anim.js';
 import { makeTile, shuffle } from './rules.js';
 
@@ -13,8 +14,8 @@ export class Stage {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x24170f);
-    this.scene.fog = new THREE.Fog(0x24170f, 18, 34);
+    this.scene.background = new THREE.Color(0xf7e6c4);
+    this.scene.fog = new THREE.Fog(0xf7e6c4, 20, 38);
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     this.scene.add(this.camera);
     this.clock = new THREE.Clock();
@@ -61,12 +62,14 @@ export class Stage {
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, high ? 2 : 1));
     r.shadowMap.enabled = high;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
-    r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 0.9;
     r.domElement.setAttribute('aria-label', '게임 테이블');
     this.container.prepend(r.domElement);
     this.renderer = r;
-    this.composer = applyGfx(r, this.scene, this.camera, { high, env: true, bloom: 0.18 });
+    this.composer = applyGfx(r, this.scene, this.camera, { high, toon: true });
+    // 낮음 품질에서는 외곽선 끔
+    this.outlinesOn = high;
+    setTileOutlines(high);
+    this.scene.traverse((o) => { if (o.userData.outline) o.visible = high; });
     setAnisotropy(high ? Math.min(8, r.capabilities.getMaxAnisotropy()) : 1);
     this.sun.castShadow = high;
     this.resize();
@@ -100,8 +103,8 @@ export class Stage {
   // ---------- 월드 ----------
   buildWorld() {
     const s = this.scene;
-    s.add(new THREE.HemisphereLight(0xffeccc, 0x2a1a10, 0.75));
-    const sun = new THREE.DirectionalLight(0xffe0b0, 2.1);
+    s.add(new THREE.HemisphereLight(0xfff6e4, 0xc9b8a0, 1.4));
+    const sun = new THREE.DirectionalLight(0xfff1d8, 2.0);
     sun.position.set(4, 13, 6);
     sun.shadow.mapSize.set(1024, 1024);
     const sc = sun.shadow.camera;
@@ -112,15 +115,13 @@ export class Stage {
     sun.shadow.bias = -0.0008;
     s.add(sun);
     this.sun = sun;
-    const lamp = new THREE.PointLight(0xffc77a, 18, 16, 1.6);
-    lamp.position.set(0, 6.5, 0);
-    s.add(lamp);
 
     // 원목 테이블
-    const wood = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.55 });
+    const wood = toonMat(0xffffff, { map: woodTexture() });
     const table = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.25, 0.5, 72), wood);
     table.position.y = -0.27;
     table.receiveShadow = true;
+    addOutline(table, { color: 0x3a2a4a, thickness: 0.05 });
     s.add(table);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(FELT_R + 0.18, 0.14, 12, 96), wood);
     rim.rotation.x = Math.PI / 2;
@@ -131,18 +132,14 @@ export class Stage {
     // 칠판색 펠트
     const felt = new THREE.Mesh(
       new THREE.CylinderGeometry(FELT_R, FELT_R, 0.04, 72),
-      [
-        new THREE.MeshStandardMaterial({ color: 0x1d4d3b, roughness: 0.95 }),
-        new THREE.MeshStandardMaterial({ map: feltTexture(), roughness: 0.95 }),
-        new THREE.MeshStandardMaterial({ color: 0x1d4d3b }),
-      ],
+      [toonMat(0x4f9c7c), toonMat(0xffffff, { map: feltTexture() }), toonMat(0x4f9c7c)],
     );
     felt.position.y = -0.02;
     felt.receiveShadow = true;
     s.add(felt);
 
     // 바닥 (어두운 교실 바닥)
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 32), new THREE.MeshStandardMaterial({ color: 0x1a110b, roughness: 1 }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 32), toonMat(0xead2a8));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -4;
     s.add(floor);
@@ -157,7 +154,7 @@ export class Stage {
     s.add(this.turnRing);
 
     this.coinGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 24);
-    this.coinMat = new THREE.MeshStandardMaterial({ color: 0xe8b931, metalness: 0.55, roughness: 0.32 });
+    this.coinMat = toonMat(0xffcf3f);
   }
 
   // ---------- 좌석 ----------
@@ -226,6 +223,7 @@ export class Stage {
     while (g.children.length < n) {
       const c = new THREE.Mesh(this.coinGeo, this.coinMat);
       c.castShadow = true;
+      addOutline(c, { color: 0x6b4a10, thickness: 0.02 }).visible = this.outlinesOn !== false;
       g.add(c);
     }
     // 두 줄로 쌓기
@@ -427,7 +425,10 @@ export class Stage {
           m.quaternion.premultiply(spin);
           m.scale.setScalar(lerp(s0, this.centerScale(), t));
         },
-        complete: () => onLand?.(j),
+        complete: () => {
+          this.boing(m);
+          onLand?.(j);
+        },
       });
     });
     this.centerPlays.push(meshes);
@@ -460,6 +461,20 @@ export class Stage {
   clearCenter() {
     for (const m of this.centerPlays.flat()) this.scene.remove(m);
     this.centerPlays = [];
+  }
+
+  /** 내려앉을 때 살짝 통통 */
+  boing(m, amt = 1) {
+    const s = m.scale.x;
+    tween({
+      duration: 0.32,
+      ease: ease.linear,
+      update: (t) => {
+        const k = Math.sin(t * Math.PI) * (1 - t) * 0.16 * amt;
+        m.scale.set(s * (1 + k), s * (1 + k), s * (1 - k));
+      },
+      complete: () => m.scale.setScalar(s),
+    });
   }
 
   // ---------- 이펙트 ----------
@@ -676,12 +691,13 @@ function woodTexture() {
   c.width = 512;
   c.height = 512;
   const g = c.getContext('2d');
-  g.fillStyle = '#8a5a33';
+  g.fillStyle = '#e0a467';
   g.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 90; i++) {
-    const y = Math.random() * 512;
-    g.strokeStyle = `rgba(${Math.random() < 0.5 ? '60,34,18' : '170,118,70'},${0.15 + Math.random() * 0.25})`;
-    g.lineWidth = 1 + Math.random() * 4;
+  // 카툰: 굵고 드문 나뭇결 몇 줄만
+  for (let i = 0; i < 14; i++) {
+    const y = (i + 0.5) * (512 / 14) + (Math.random() - 0.5) * 10;
+    g.strokeStyle = 'rgba(176,112,60,0.55)';
+    g.lineWidth = 5;
     g.beginPath();
     g.moveTo(0, y);
     for (let x = 0; x <= 512; x += 32) g.lineTo(x, y + Math.sin(x * 0.01 + i) * 6);
@@ -697,26 +713,18 @@ function feltTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 1024;
   const g = c.getContext('2d');
-  g.fillStyle = '#1f5240';
+  g.fillStyle = '#4f9c7c';
   g.fillRect(0, 0, 1024, 1024);
-  const img = g.getImageData(0, 0, 1024, 1024);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 18;
-    img.data[i] += n;
-    img.data[i + 1] += n;
-    img.data[i + 2] += n;
-  }
-  g.putImageData(img, 0, 0);
   // 분필로 그린 듯한 놓는 자리
-  g.strokeStyle = 'rgba(255,255,255,0.16)';
-  g.lineWidth = 5;
+  g.strokeStyle = 'rgba(255,255,255,0.5)';
+  g.lineWidth = 8;
   g.setLineDash([22, 16]);
   g.beginPath();
   g.ellipse(512, 512, 330, 220, 0, 0, Math.PI * 2);
   g.stroke();
   g.setLineDash([]);
-  g.strokeStyle = 'rgba(255,255,255,0.07)';
-  g.lineWidth = 3;
+  g.strokeStyle = 'rgba(255,255,255,0.25)';
+  g.lineWidth = 6;
   g.beginPath();
   g.arc(512, 512, 490, 0, Math.PI * 2);
   g.stroke();

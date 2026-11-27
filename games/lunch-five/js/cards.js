@@ -12,14 +12,14 @@ const FONT = '"Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 
 /** 메뉴마다 카드 바탕색 (식판 칸 색) */
 const BG = {
-  tteok: ['#fff1ea', '#ffd9c7'],
-  donkatsu: ['#fff7e3', '#ffe7b0'],
-  gimbap: ['#effbe9', '#cdeec0'],
-  milk: ['#eef6ff', '#cfe4ff'],
-  pudding: ['#fffbe0', '#fff0a6'],
+  tteok: ['#ffd6cc'],
+  donkatsu: ['#ffe9b8'],
+  gimbap: ['#d4f5c4'],
+  milk: ['#cfe6ff'],
+  pudding: ['#fff3a8'],
 };
 
-function face(g, x, y, s, { eyeY = 0, color = '#3a2516' } = {}) {
+function face(g, x, y, s, { eyeY = 0, color = '#2b2d55' } = {}) {
   // 귀여운 얼굴: 눈 두 개, 웃는 입, 볼터치
   g.fillStyle = color;
   g.beginPath();
@@ -69,13 +69,6 @@ export const DRAW_MENU = {
     cake(x - s * 0.08, y - s * 0.32, -0.25);
     cake(x + s * 0.12, y + s * 0.05, 0.12);
     cake(x - s * 0.15, y + s * 0.42, -0.08);
-    // 깨
-    g.fillStyle = '#fff6d8';
-    for (let i = 0; i < 6; i++) {
-      g.beginPath();
-      g.ellipse(x - s * 0.6 + i * s * 0.25, y - s * 0.05 + (i % 2) * s * 0.55, s * 0.04, s * 0.025, i, 0, Math.PI * 2);
-      g.fill();
-    }
     face(g, x + s * 0.12, y + s * 0.03, s * 0.55);
   },
 
@@ -93,15 +86,6 @@ export const DRAW_MENU = {
     g.beginPath();
     g.ellipse(x - s * 0.05, y - s * 0.06, s * 0.88, s * 0.6, -0.15, 0, Math.PI * 2);
     g.fill();
-    // 빵가루 점
-    g.fillStyle = '#ffd27a';
-    for (let i = 0; i < 26; i++) {
-      const a = i * 2.4;
-      const r = (0.25 + ((i * 37) % 10) / 16) * s * 0.7;
-      g.beginPath();
-      g.arc(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.7, s * 0.05, 0, Math.PI * 2);
-      g.fill();
-    }
     // 소스
     g.strokeStyle = '#6b3415';
     g.lineWidth = s * 0.12;
@@ -123,14 +107,6 @@ export const DRAW_MENU = {
     g.beginPath();
     g.arc(x, y, s * 0.8, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#e9e6d8';
-    for (let i = 0; i < 18; i++) {
-      const a = i * 1.7;
-      const r = s * (0.45 + (i % 3) * 0.1);
-      g.beginPath();
-      g.ellipse(x + Math.cos(a) * r, y + Math.sin(a) * r, s * 0.07, s * 0.04, a, 0, Math.PI * 2);
-      g.fill();
-    }
     const fill = [
       ['#ffcd2e', -0.22, -0.18],
       ['#ff8a3d', 0.2, -0.2],
@@ -147,7 +123,7 @@ export const DRAW_MENU = {
     g.arc(x, y, s * 0.11, 0, Math.PI * 2);
     g.fill();
     // 김에 붙은 작은 얼굴은 위쪽 밥 위에
-    face(g, x, y - s * 0.55, s * 0.42, { color: '#2b1d10' });
+    face(g, x, y - s * 0.55, s * 0.42, { color: '#2b2d55' });
   },
 
   milk(g, x, y, s) {
@@ -254,44 +230,84 @@ const SPOTS = {
 };
 const SIZE = { 1: 0.32, 2: 0.25, 3: 0.2, 4: 0.2, 5: 0.17 };
 
+export const INK = '#2b2d55';
+
+/** 메뉴 그림을 진한 남색 외곽선으로 감싸기 (오프스크린에 그려 여러 방향으로 찍음) */
+const stickerCache = new Map();
+function menuSticker(menu, s) {
+  const key = menu + ':' + Math.round(s);
+  if (stickerCache.has(key)) return stickerCache.get(key);
+  const size = Math.ceil(s * 3);
+  const art = document.createElement('canvas');
+  art.width = art.height = size;
+  DRAW_MENU[menu]?.(art.getContext('2d'), size / 2, size / 2, s);
+  const out = document.createElement('canvas');
+  out.width = out.height = size;
+  const og = out.getContext('2d');
+  const t = Math.max(2.5, s * 0.09);
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2;
+    og.drawImage(art, Math.cos(a) * t, Math.sin(a) * t);
+  }
+  og.globalCompositeOperation = 'source-in';
+  og.fillStyle = INK;
+  og.fillRect(0, 0, size, size);
+  og.globalCompositeOperation = 'source-over';
+  og.drawImage(art, 0, 0);
+  stickerCache.set(key, out);
+  return out;
+}
+
 export function drawCard(g, code, w = W, h = H) {
   const menu = cardMenu(code);
   const n = cardCount(code);
-  const [c1, c2] = BG[menu] || ['#fff', '#eee'];
+  const [c1] = BG[menu] || ['#fff'];
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, w, h);
-  const grad = g.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, c1);
-  grad.addColorStop(1, c2);
-  g.fillStyle = grad;
-  roundRect(g, 10, 10, w - 20, h - 20, 22);
+  // 카툰: 단색 바탕 + 두꺼운 남색 테두리 + 둥근 모서리
+  g.fillStyle = c1;
+  roundRect(g, 9, 9, w - 18, h - 18, 24);
   g.fill();
-  // 식판 칸 테두리 느낌
-  g.strokeStyle = 'rgba(80,90,110,.25)';
-  g.lineWidth = 4;
-  roundRect(g, 16, 16, w - 32, h - 32, 18);
+  g.strokeStyle = INK;
+  g.lineWidth = 9;
   g.stroke();
   const pts = SPOTS[n] || SPOTS[1];
   const s = SIZE[n] * w;
-  pts.forEach(([px, py]) => {
-    g.fillStyle = 'rgba(0,0,0,.08)';
+  const st = menuSticker(menu, s);
+  pts.forEach(([px, py]) => g.drawImage(st, px * w - st.width / 2, py * h - st.height / 2));
+  // 모서리 개수 숫자 (위·아래 두 곳, 아래쪽은 거꾸로 — 어느 자리에서 봐도 읽힘)
+  const badge = (x, y, rot) => {
+    g.save();
+    g.translate(x, y);
+    g.rotate(rot);
+    g.fillStyle = '#ffffff';
+    g.strokeStyle = INK;
+    g.lineWidth = 5;
     g.beginPath();
-    g.ellipse(px * w, py * h + s * 0.85, s * 0.85, s * 0.2, 0, 0, Math.PI * 2);
+    g.arc(0, 0, 24, 0, Math.PI * 2);
     g.fill();
-    DRAW_MENU[menu]?.(g, px * w, py * h, s);
-  });
+    g.stroke();
+    g.fillStyle = INK;
+    g.font = `38px ${FONT}`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(n), 0, 2);
+    g.restore();
+  };
+  badge(36, 36, 0);
+  badge(w - 36, h - 36, Math.PI);
 }
 
 export function drawBack(g, w = W, h = H) {
   // 스테인리스 식판 무늬 뒷면
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, w, h);
-  const grad = g.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, '#2fb3a0');
-  grad.addColorStop(1, '#1e7f8f');
-  g.fillStyle = grad;
-  roundRect(g, 10, 10, w - 20, h - 20, 22);
+  g.fillStyle = '#3cc4ad';
+  roundRect(g, 9, 9, w - 18, h - 18, 24);
   g.fill();
+  g.strokeStyle = INK;
+  g.lineWidth = 9;
+  g.stroke();
   // 식판 칸
   g.fillStyle = 'rgba(255,255,255,.18)';
   roundRect(g, 32, 34, 86, 70, 16);
@@ -313,6 +329,11 @@ export function drawBack(g, w = W, h = H) {
   g.beginPath();
   g.arc(w / 2, h / 2 - 4, 50, 0, Math.PI * 2);
   g.fill();
+  g.strokeStyle = INK;
+  g.lineWidth = 6;
+  g.beginPath();
+  g.arc(w / 2, h / 2 - 4, 62, 0, Math.PI * 2);
+  g.stroke();
   g.fillStyle = '#c0392b';
   g.font = `44px ${FONT}`;
   g.textAlign = 'center';

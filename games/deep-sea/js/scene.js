@@ -1,8 +1,11 @@
 // 밤바다 위 범선 갑판: 물결, 안개, 랜턴, 둥근 해도 테이블, 카드 줄, 열쇠, 연출
 import * as THREE from 'three';
 import { applyGfx } from '../../../shared/gfx.js';
+import { toonMat, addOutline } from '../../../shared/table3d.js';
 import { tween, updateTweens, ease, lerp } from '../../../shared/anim.js';
-import { createCardMesh, setCardFace, setAnisotropy, CARD_W, CARD_H, CARD_T } from './cards.js';
+import { createCardMesh, setCardFace, setAnisotropy, setCardOutlines, CARD_W, CARD_H, CARD_T } from './cards.js';
+
+const LINE = 0x1c2350; // 외곽선: 진한 남색
 
 const TABLE_R = 5.2;
 const SEAT_R = 3.9;
@@ -11,8 +14,8 @@ export class SeaStage {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x061321);
-    this.scene.fog = new THREE.Fog(0x061321, 20, 70);
+    this.scene.background = new THREE.Color(0x2b3f86);
+    this.scene.fog = new THREE.Fog(0x2b3f86, 26, 70);
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
     this.clock = new THREE.Clock();
     this.raycaster = new THREE.Raycaster();
@@ -45,13 +48,16 @@ export class SeaStage {
     const r = new THREE.WebGLRenderer({ antialias: high, powerPreference: high ? 'high-performance' : 'low-power' });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, high ? 2 : 1));
     r.shadowMap.enabled = high;
-    r.shadowMap.type = THREE.PCFSoftShadowMap;
-    r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.15;
+    // 카툰: 톤매핑·그림자 방식은 applyGfx(toon)가 정함
     r.domElement.setAttribute('aria-label', '게임 테이블');
     this.container.prepend(r.domElement);
     this.renderer = r;
-    this.composer = applyGfx(r, this.scene, this.camera, { high, env: false, bloom: 0.45 });
+    this.composer = applyGfx(r, this.scene, this.camera, { high, toon: true });
+    this.outlinesOn = high;
+    setCardOutlines(high);
+    this.scene.traverse((o) => {
+      if (o.userData.outline) o.visible = high;
+    });
     this.moon.castShadow = high;
     setAnisotropy(high ? Math.min(8, r.capabilities.getMaxAnisotropy()) : 1);
     this.waveDetail = high ? 1 : 0.5;
@@ -76,32 +82,46 @@ export class SeaStage {
   // ---------- 월드 ----------
   buildWorld() {
     const s = this.scene;
-    s.add(new THREE.HemisphereLight(0x6f8fc8, 0x0a0a10, 0.75));
-    const moon = new THREE.DirectionalLight(0x9fb8ff, 1.1);
+    s.add(new THREE.HemisphereLight(0xc9d6ff, 0x4a4f8a, 1.6));
+    const moon = new THREE.DirectionalLight(0xfff3d6, 1.7);
     moon.position.set(-8, 14, -6);
     moon.shadow.mapSize.set(1024, 1024);
     Object.assign(moon.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 2, far: 40 });
     s.add(moon);
     this.moon = moon;
+    // 동화풍 달과 별
+    const moonBall = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), new THREE.MeshBasicMaterial({ color: 0xfff1b8, fog: false }));
+    moonBall.position.set(-22, 16, -40);
+    s.add(moonBall);
+    const starPos = [];
+    for (let i = 0; i < 90; i++) {
+      const a = Math.random() * Math.PI * 2;
+      starPos.push(Math.cos(a) * 50, 8 + Math.random() * 30, Math.sin(a) * 50 - 10);
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+    s.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xfff6c8, size: 0.5, fog: false })));
     // 랜턴 두 개 (깜빡임)
     this.lanterns = [];
     for (const [x, z] of [[-4.6, -3.2], [4.6, -3.2]]) {
-      const light = new THREE.PointLight(0xffb052, 14, 14, 1.6);
+      const light = new THREE.PointLight(0xffc46b, 10, 14, 1.6);
       light.position.set(x, 2.6, z);
       s.add(light);
-      const glass = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffd38a }));
+      const glass = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
       glass.position.copy(light.position);
       s.add(glass);
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6), new THREE.MeshStandardMaterial({ color: 0x3b2716 }));
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6), toonMat(0x8a5a3a));
       pole.position.set(x, 1.3, z);
       s.add(pole);
+      this.outline(glass, 0.03);
+      this.outline(pole, 0.03);
       this.lanterns.push(light);
     }
     // 바다
     const segs = 70;
     const ocean = new THREE.Mesh(
       new THREE.PlaneGeometry(90, 90, segs, segs),
-      new THREE.MeshStandardMaterial({ color: 0x15507f, roughness: 0.3, metalness: 0.25, flatShading: true }),
+      Object.assign(toonMat(0x3f86d9), { flatShading: true }),
     );
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.y = -2.4;
@@ -109,26 +129,30 @@ export class SeaStage {
     this.ocean = ocean;
     this.oceanBase = Float32Array.from(ocean.geometry.attributes.position.array);
     // 갑판
-    const plankMat = new THREE.MeshStandardMaterial({ map: plankTexture(), roughness: 0.8 });
+    const plankMat = toonMat(0xffffff, { map: plankTexture() });
     const deck = new THREE.Mesh(new THREE.BoxGeometry(15, 0.4, 13), plankMat);
     deck.position.y = -1.3;
     deck.receiveShadow = true;
     s.add(deck);
+    this.outline(deck, 0.06);
     // 둥근 해도 테이블
-    const wood = new THREE.MeshStandardMaterial({ color: 0x5a3820, roughness: 0.6 });
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_R, TABLE_R, 0.2, 64), [wood, new THREE.MeshStandardMaterial({ map: chartTexture(), roughness: 0.85 }), wood]);
+    const wood = toonMat(0xb0703f);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_R, TABLE_R, 0.2, 64), [wood, toonMat(0xffffff, { map: chartTexture() }), wood]);
     top.position.y = -0.1;
     top.receiveShadow = true;
     s.add(top);
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 1.1, 24), wood);
     leg.position.y = -0.7;
     s.add(leg);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(TABLE_R, 0.09, 10, 96), new THREE.MeshStandardMaterial({ color: 0xb8892f, metalness: 0.6, roughness: 0.35 }));
+    this.outline(top, 0.05);
+    this.outline(leg, 0.04);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(TABLE_R, 0.09, 10, 96), toonMat(0xf2c14e));
     rim.rotation.x = Math.PI / 2;
     s.add(rim);
     // 열쇠
     this.key = makeKey();
     this.key.visible = false;
+    this.key.children.forEach((c) => this.outline(c, 0.025));
     s.add(this.key);
     // 촉수 그림자 (문어 연출)
     this.tentacles = [];
@@ -141,15 +165,35 @@ export class SeaStage {
       }
       const tube = new THREE.Mesh(
         new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.32, 8, false),
-        new THREE.MeshStandardMaterial({ color: 0x2b0f3f, emissive: 0x220833, roughness: 0.4, transparent: true, opacity: 0.92 }),
+        toonMat(0x9b6bf2, { emissive: 0x2a1250 }),
       );
       tube.position.set(Math.sin(a) * (TABLE_R + 1.6), -2.5, Math.cos(a) * (TABLE_R + 1.6));
       tube.rotation.y = a + Math.PI;
       tube.scale.set(1, 0.001, 1);
       tube.visible = false;
+      this.outline(tube, 0.05);
       s.add(tube);
       this.tentacles.push(tube);
     }
+  }
+
+  outline(mesh, thickness = 0.04) {
+    const o = addOutline(mesh, { color: LINE, thickness });
+    o.visible = this.outlinesOn !== false;
+    return o;
+  }
+
+  /** 통통: 납작했다가 살짝 커졌다가 원래대로 (base = 기본 크기) */
+  boing(m, base, amount = 1) {
+    return tween({
+      duration: 0.35,
+      ease: ease.linear,
+      update: (k) => {
+        const w = Math.sin(k * Math.PI * 2) * Math.exp(-k * 3) * 0.2 * amount;
+        m.scale.set(base * (1 + w), base * (1 - w * 1.4), base * (1 + w));
+      },
+      complete: () => m.scale.setScalar(base),
+    });
   }
 
   // ---------- 좌석 ----------
@@ -282,6 +326,7 @@ export class SeaStage {
       },
     });
     this.revealedMeshes.push(m);
+    this.boing(m, 0.56);
     return m;
   }
 
@@ -351,7 +396,7 @@ export class SeaStage {
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: 0.13, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: 0.16, transparent: true, depthWrite: false }));
     this.scene.add(pts);
     let last = 0;
     tween({
@@ -378,7 +423,7 @@ export class SeaStage {
   }
 
   dust(pos) {
-    this.sparkle(pos, 0x9fb3c8, 40, 1.2);
+    this.sparkle(pos, 0xd7e3ff, 40, 1.2);
   }
 
   async monster() {
@@ -509,11 +554,11 @@ export class SeaStage {
         pos.array[i * 3 + 2] = Math.sin(x * 0.35 + time * 1.1) * 0.35 + Math.cos(y * 0.28 + time * 0.8) * 0.3;
       }
       pos.needsUpdate = true;
-      this.ocean.geometry.computeVertexNormals();
+      // 평면 셰이딩이라 법선 재계산 불필요
     }
 
     // 랜턴 깜빡임
-    this.lanterns.forEach((l, i) => (l.intensity = 13 + Math.sin(time * 7 + i * 2) * 1.2 + Math.sin(time * 13 + i) * 0.8));
+    this.lanterns.forEach((l, i) => (l.intensity = 10 + Math.sin(time * 7 + i * 2) * 0.8 + Math.sin(time * 13 + i) * 0.5));
 
     // 열쇠: 떠서 빙글
     if (this.key.visible && this.keyHome) {
@@ -551,7 +596,7 @@ export class SeaStage {
 // ---------- 소품과 텍스처 ----------
 function makeKey() {
   const g = new THREE.Group();
-  const gold = new THREE.MeshStandardMaterial({ color: 0xe8b931, metalness: 0.8, roughness: 0.25, emissive: 0x3a2800 });
+  const gold = toonMat(0xffcf3f, { emissive: 0x3a2800 });
   const bow = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 10, 24), gold);
   bow.position.x = -0.42;
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.7, 10), gold);
@@ -570,17 +615,14 @@ function plankTexture() {
   c.width = c.height = 512;
   const g = c.getContext('2d');
   for (let i = 0; i < 8; i++) {
-    g.fillStyle = `hsl(28, ${35 + (i % 3) * 5}%, ${18 + (i % 2) * 4}%)`;
-    g.fillRect(0, i * 64, 512, 62);
-    g.fillStyle = 'rgba(0,0,0,0.5)';
-    g.fillRect(0, i * 64 + 62, 512, 2);
-    for (let k = 0; k < 20; k++) {
-      g.strokeStyle = 'rgba(0,0,0,0.12)';
+    g.fillStyle = i % 2 ? '#c98a55' : '#d89a62';
+    g.fillRect(0, i * 64, 512, 60);
+    g.fillStyle = '#6b3f2a';
+    g.fillRect(0, i * 64 + 60, 512, 4);
+    for (const x of [60 + (i % 3) * 140, 330 + (i % 2) * 90]) {
       g.beginPath();
-      const y = i * 64 + Math.random() * 60;
-      g.moveTo(0, y);
-      g.lineTo(512, y + (Math.random() - 0.5) * 6);
-      g.stroke();
+      g.arc(x, i * 64 + 30, 4, 0, Math.PI * 2);
+      g.fill();
     }
   }
   const t = new THREE.CanvasTexture(c);
@@ -595,10 +637,7 @@ function chartTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 1024;
   const g = c.getContext('2d');
-  const grad = g.createRadialGradient(512, 512, 100, 512, 512, 520);
-  grad.addColorStop(0, '#e9d7a8');
-  grad.addColorStop(1, '#b89a5e');
-  g.fillStyle = grad;
+  g.fillStyle = '#f7e6b5';
   g.fillRect(0, 0, 1024, 1024);
   g.strokeStyle = 'rgba(80,50,20,0.18)';
   g.lineWidth = 2;
@@ -610,17 +649,21 @@ function chartTexture() {
     g.stroke();
   }
   // 섬
-  g.fillStyle = 'rgba(120,90,40,0.35)';
+  g.fillStyle = '#9fd47a';
+  g.strokeStyle = '#1c2350';
+  g.lineWidth = 6;
   for (const [x, y, r] of [[300, 260, 60], [760, 340, 44], [680, 760, 70], [240, 720, 36]]) {
     g.beginPath();
     for (let k = 0; k < 14; k++) {
       const a = (k / 14) * Math.PI * 2;
-      const rr = r * (0.7 + Math.random() * 0.5);
+      const rr = r * (0.85 + Math.sin(k * 2.3 + x) * 0.15);
       g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
     }
+    g.closePath();
     g.fill();
+    g.stroke();
   }
-  g.strokeStyle = 'rgba(160,30,30,0.5)';
+  g.strokeStyle = '#e8505b';
   g.setLineDash([14, 12]);
   g.lineWidth = 5;
   g.beginPath();
@@ -628,7 +671,7 @@ function chartTexture() {
   g.bezierCurveTo(500, 300, 520, 600, 680, 760);
   g.stroke();
   g.setLineDash([]);
-  g.strokeStyle = 'rgba(160,30,30,0.7)';
+  g.strokeStyle = '#e8505b';
   g.lineWidth = 8;
   g.beginPath();
   g.moveTo(660, 740);
@@ -636,8 +679,8 @@ function chartTexture() {
   g.moveTo(700, 740);
   g.lineTo(660, 780);
   g.stroke();
-  g.strokeStyle = 'rgba(80,50,20,0.35)';
-  g.lineWidth = 6;
+  g.strokeStyle = '#1c2350';
+  g.lineWidth = 14;
   g.beginPath();
   g.arc(512, 512, 500, 0, Math.PI * 2);
   g.stroke();

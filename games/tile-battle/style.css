@@ -7,7 +7,8 @@
   --paper: #ffffff;
   --hl: #ffd84d;           /* 형광펜 */
   --felt: #1f5240;
-  --wood: #24170f;
+  --wood: #f7e6c4;         /* 카툰: 밝은 크림 배경 (3D 배경색과 같음) */
+  --theme-bg: #f7e6c4;
   --ok: #15803d;
   --radius-lg: 18px;
   --radius-sm: 12px;
@@ -120,8 +121,8 @@ button, input { font: inherit; color: inherit; }
 .icon-btn.close { margin-left: auto; width: 38px; height: 38px; background: rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
 
 /* ---------- 타이틀 ---------- */
-#screen-title { background: radial-gradient(ellipse at center, transparent 30%, rgba(20, 12, 6, 0.55) 100%); }
-.title-wrap { text-align: center; color: #fff; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); }
+#screen-title { background: radial-gradient(ellipse at center, transparent 35%, rgba(42, 34, 64, 0.35) 100%); }
+.title-wrap { text-align: center; color: #fff; text-shadow: 0 3px 0 #2a2240, 0 0 14px rgba(42, 34, 64, 0.7); }
 .stamp {
   display: inline-block;
   font-family: var(--display);

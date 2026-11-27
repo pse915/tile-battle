@@ -1,6 +1,6 @@
 /* 급식 다섯! — 밝은 급식실, 민트 테이블, 금빛 종 */
 :root {
-  --theme-bg: #1e6f78;
+  --theme-bg: #fff1d6;
   --accent: #ffe066;
   --title-stroke: #c0392b;
   --lf-bell: #ffc93c;
@@ -30,8 +30,8 @@
 
 /* ---------- 봇 연습 / 온라인: 아래 바 ---------- */
 .lf-bottom { align-items: center; }
-.lf-me-info { color: #fff; font-family: var(--display); text-shadow: 0 2px 4px rgba(0,0,0,.6); font-size: 1rem; }
-.lf-me-info .lf-go { color: var(--accent); }
+.lf-me-info { color: #2b2d55; font-family: var(--display); text-shadow: 0 1px 0 #fff, 0 0 6px #fff; font-size: 1rem; }
+.lf-me-info .lf-go { color: #d9486a; }
 .lf-me-row { display: flex; gap: 12px; width: min(520px, 100%); }
 .lf-me-row .lf-flip { flex: 1; min-height: 64px; }
 .lf-me-row .lf-bell { flex: 1.4; min-height: 76px; font-size: 1.8rem; }
@@ -121,3 +121,6 @@
   .lf-note { font-size: 0.72rem; top: calc(60px + var(--safe-t)); }
   .lf-pad { --ph: 96px; }
 }
+/* 카툰 테마: 밝은 크림 배경에서도 위쪽 글씨가 또렷하게 */
+#hud .hud-round { color: #2b2d55; text-shadow: 0 1px 0 #fff, 0 0 6px #fff; }
+.lf-tcard { border: 2px solid #2b2d55; }

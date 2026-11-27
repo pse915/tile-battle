@@ -6,25 +6,39 @@ export const TW = 256;
 export const TH = 364;
 export const TILE_RATIO = TH / TW;
 
+// 카툰 팔레트: 검정 = 진한 남보라, 흰 = 크림. 테두리는 외곽선과 같은 남색 계열
+const OUTLINE = '#22203f';
 const PAL = {
-  b: { bg1: '#2a2d38', bg2: '#15161c', ink: '#f3ecd9', line: 'rgba(255,255,255,.10)', glow: '#6ff0c8' },
-  w: { bg1: '#fbf7ec', bg2: '#ddd5c2', ink: '#1a1c24', line: 'rgba(0,0,0,.10)', glow: '#1f9c7d' },
+  b: { bg: '#34345e', ink: '#fff6dc', line: 'rgba(255,255,255,.22)', glow: '#7ff0c8', border: '#141230' },
+  w: { bg: '#fff6dc', ink: '#2a2850', line: 'rgba(42,40,80,.22)', glow: '#ff7f9e', border: OUTLINE },
 };
 
 function base(ctx, w, h, c) {
   const p = PAL[c];
-  const g = ctx.createLinearGradient(0, 0, w, h);
-  g.addColorStop(0, p.bg1);
-  g.addColorStop(1, p.bg2);
-  ctx.fillStyle = g;
-  roundRect(ctx, 0, 0, w, h, 26);
+  ctx.fillStyle = p.border;
+  roundRect(ctx, 0, 0, w, h, 34);
   ctx.fill();
-  // 모서리 깎인 느낌의 안쪽 테두리
-  ctx.strokeStyle = p.line;
-  ctx.lineWidth = 6;
-  roundRect(ctx, 12, 12, w - 24, h - 24, 18);
-  ctx.stroke();
+  ctx.fillStyle = p.bg;
+  roundRect(ctx, 14, 14, w - 28, h - 28, 24);
+  ctx.fill();
+  // 위쪽 하이라이트 띠 (단순한 한 줄)
+  ctx.fillStyle = c === 'b' ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.6)';
+  roundRect(ctx, 26, 24, w - 52, 18, 9);
+  ctx.fill();
   return p;
+}
+
+/** 색만으로 구분하지 않도록 구석 표식: 검정 = 채운 동그라미, 흰 = 빈 동그라미 */
+function colorMark(ctx, w, h, c, p) {
+  ctx.beginPath();
+  ctx.arc(w - 40, 52, 11, 0, Math.PI * 2);
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = p.ink;
+  if (c === 'b') {
+    ctx.fillStyle = p.ink;
+    ctx.fill();
+  }
+  ctx.stroke();
 }
 
 /** 열쇠 모양 (조커) */
@@ -56,6 +70,7 @@ function drawKey(ctx, cx, cy, s, color) {
 /** 앞면: 큰 숫자(6·9 밑줄), 아래쪽 작은 자물쇠 눈금. n == null 이면 모르는 앞면 */
 function drawFront(ctx, w, h, c, n) {
   const p = base(ctx, w, h, c);
+  colorMark(ctx, w, h, c, p);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (n == null) {
@@ -73,8 +88,12 @@ function drawFront(ctx, w, h, c, n) {
   }
   ctx.fillStyle = p.ink;
   const two = n >= 10;
-  ctx.font = `${Math.round(h * (two ? 0.4 : 0.5))}px Jua, sans-serif`;
-  ctx.fillText(String(n), w / 2, h * 0.47);
+  ctx.font = `${Math.round(h * (two ? 0.44 : 0.56))}px Jua, sans-serif`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = c === 'b' ? p.border : 'rgba(255,255,255,.9)';
+  ctx.strokeText(String(n), w / 2, h * 0.48);
+  ctx.fillText(String(n), w / 2, h * 0.48);
   if (n === 6 || n === 9) {
     ctx.fillRect(w * 0.32, h * 0.71, w * 0.36, h * 0.025);
   }
@@ -82,7 +101,7 @@ function drawFront(ctx, w, h, c, n) {
   for (let i = 0; i < 12; i++) {
     const x = w * 0.2 + (i * (w * 0.6)) / 11;
     ctx.beginPath();
-    ctx.arc(x, h * 0.86, 4.5, 0, Math.PI * 2);
+    ctx.arc(x, h * 0.86, 6, 0, Math.PI * 2);
     ctx.fillStyle = i < n ? p.glow : p.line;
     ctx.fill();
   }
@@ -91,18 +110,19 @@ function drawFront(ctx, w, h, c, n) {
 /** 뒷면: 다이얼 자물쇠 무늬 (색만 보임) */
 function drawBack(ctx, w, h, c) {
   const p = base(ctx, w, h, c);
+  colorMark(ctx, w, h, c, p);
   const cx = w / 2;
   const cy = h / 2;
   ctx.strokeStyle = p.line;
   for (let r = 0; r < 3; r++) {
-    ctx.lineWidth = r === 1 ? 7 : 3;
+    ctx.lineWidth = r === 1 ? 9 : 5;
     ctx.beginPath();
     ctx.arc(cx, cy, w * (0.16 + r * 0.1), 0, Math.PI * 2);
     ctx.stroke();
   }
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2;
-    ctx.lineWidth = i % 3 === 0 ? 6 : 3;
+    ctx.lineWidth = i % 3 === 0 ? 8 : 5;
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(a) * w * 0.38, cy + Math.sin(a) * w * 0.38);
     ctx.lineTo(cx + Math.cos(a) * w * 0.44, cy + Math.sin(a) * w * 0.44);

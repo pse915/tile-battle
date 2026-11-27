@@ -1,6 +1,6 @@
 // 컬러 러시 3D: 칠판 테이블 가운데 버린 더미(살짝 비틀려 쌓임)와 뽑을 더미,
 // 자리마다 뒷면 카드 부채, 방향 화살표 링(지금 색으로 물듦, 방향을 바꾸면 뒤집혀 돎)
-import { TableStage, THREE, cardMesh, canvasTexture } from '../../../shared/table3d.js';
+import { TableStage, THREE, canvasTexture, toonMat, addOutline } from '../../../shared/table3d.js';
 import { tween, ease, wait } from '../../../shared/anim.js';
 import { cardTex, backTex } from './cards.js';
 import { COLOR_HEX } from './rules.js';
@@ -11,40 +11,51 @@ const CARD_T = 0.018;
 const DRAW_POS = new THREE.Vector3(-0.72, 0, 0);
 const DISCARD_POS = new THREE.Vector3(0.72, 0, 0);
 const PILE_SHOW = 7;
+const INK = 0x1f3550; // 외곽선: 진한 남색
+const EDGE = 0xf2c98a; // 카드 옆면
+
+// 카툰 카드 메시: 위(+y) 앞면, 아래 뒷면, 남색 외곽선
+const geoCache = new Map();
+const matCache = new Map();
+let sideToon = null;
+let outlinesOn = true;
+function texMat(tex) {
+  if (!matCache.has(tex)) matCache.set(tex, toonMat(0xffffff, { map: tex }));
+  return matCache.get(tex);
+}
+function cardMesh({ w, h, t, face, back }) {
+  sideToon ||= toonMat(EDGE);
+  const k = w + ',' + h;
+  if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, t, h));
+  const m = new THREE.Mesh(geoCache.get(k), [sideToon, sideToon, texMat(face), texMat(back), sideToon, sideToon]);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  addOutline(m, { color: INK, thickness: 0.022 }).visible = outlinesOn;
+  return m;
+}
+
 const ME_POS = new THREE.Vector3(0, 1.6, 4.6); // 화면 아래(내 손) 쪽
 
 function drawFelt(ctx, w, h) {
-  // 초록 칠판 + 분필 낙서
-  const g = ctx.createRadialGradient(w / 2, h / 2, 60, w / 2, h / 2, w * 0.7);
-  g.addColorStop(0, '#2f5a48');
-  g.addColorStop(1, '#1b3a2e');
-  ctx.fillStyle = g;
+  // 밝은 초록 칠판(단색) + 굵은 분필 낙서 몇 개
+  ctx.fillStyle = '#3f9474';
   ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
-    ctx.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 6, 1 + Math.random() * 2);
-  }
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineCap = 'round';
-  for (let i = 0; i < 6; i++) {
-    ctx.lineWidth = 40 + Math.random() * 40;
-    ctx.beginPath();
-    const y = Math.random() * h;
-    ctx.moveTo(Math.random() * w * 0.3, y);
-    ctx.quadraticCurveTo(w / 2, y + (Math.random() - 0.5) * 120, w * (0.7 + Math.random() * 0.3), y + (Math.random() - 0.5) * 80);
-    ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(255,255,255,0.16)';
-  ctx.font = '38px Jua, sans-serif';
-  const doodles = ['3 × 7 = 21', 'x² + y²', '가 나 다 라', '시험 끝!', '½ + ¼ = ¾', '★ 참 잘했어요', 'H₂O', '♪ ♫'];
+  ctx.lineWidth = 70;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.1, h * 0.3);
+  ctx.quadraticCurveTo(w / 2, h * 0.22, w * 0.9, h * 0.34);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
+  ctx.font = '42px Jua, sans-serif';
+  ctx.textAlign = 'center';
+  const doodles = ['3 × 7 = 21', '★ 참 잘했어요', '가 나 다', '♪ ♫', '½ + ¼ = ¾', '시험 끝!'];
+  const spots = [[0.13, 0.2], [0.85, 0.22], [0.12, 0.8], [0.88, 0.78], [0.5, 0.08], [0.5, 0.93]];
   doodles.forEach((t, i) => {
     ctx.save();
-    const edge = i % 4;
-    const x = edge === 0 ? 120 : edge === 1 ? w - 160 : 160 + Math.random() * (w - 320);
-    const y = edge < 2 ? 120 + Math.random() * (h - 240) : edge === 2 ? 70 : h - 70;
-    ctx.translate(x, y);
-    ctx.rotate((Math.random() - 0.5) * 0.4);
-    ctx.textAlign = 'center';
+    ctx.translate(spots[i][0] * w, spots[i][1] * h);
+    ctx.rotate((i % 2 ? 1 : -1) * 0.12);
     ctx.fillText(t, 0, 0);
     ctx.restore();
   });
@@ -57,7 +68,7 @@ function drawRing(ctx, w) {
   const R1 = c - 2;
   const mid = (R0 + R1) / 2;
   ctx.clearRect(0, 0, w, w);
-  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
   ctx.lineWidth = R1 - R0 - 6;
   ctx.beginPath();
   ctx.arc(c, c, mid, 0, Math.PI * 2);
@@ -86,9 +97,11 @@ function drawRing(ctx, w) {
 export class CRStage {
   constructor(container) {
     this.stage = new TableStage(container, {
-      bg: 0x14211d,
-      floor: 0x0f1915,
-      rim: 0x9a6b3c,
+      bg: 0xfbe9c6,
+      floor: 0xe8be8a,
+      rim: 0xd98f55,
+      toon: true,
+      fitWidth: 9.4,
       tableW: 13,
       tableD: 9.4,
       drawFelt,
@@ -105,6 +118,7 @@ export class CRStage {
     this.dir = 1;
     this.turn = -1;
     this.onDraw = null;
+    outlinesOn = this.s.outlinesOn !== false;
     this.build();
     this.s.onPick = (d) => d.drawPile && this.onDraw?.();
     this.s.onResize = () => this.layoutSeats();
@@ -112,6 +126,7 @@ export class CRStage {
 
   setQuality(q) {
     this.s.setQuality(q);
+    outlinesOn = this.s.outlinesOn !== false;
   }
   setTitleMode(on) {
     this.s.setTitleMode(on);
@@ -157,12 +172,14 @@ export class CRStage {
     this.turnMark.visible = false;
     g.add(this.turnMark);
     // 분필 받침 장식
-    const tray = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 0.35), new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.6 }));
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 0.35), toonMat(0xc9844a));
+    addOutline(tray, { color: INK, thickness: 0.03 }).visible = outlinesOn;
     tray.position.set(4.2, 0.06, -3.9);
     tray.castShadow = true;
     g.add(tray);
     ['#ffffff', '#3ad6b4', '#ff5ca8', '#ff9a2e'].forEach((c, i) => {
-      const chalk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.55, 12), new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+      const chalk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.55, 12), toonMat(c));
+      addOutline(chalk, { color: INK, thickness: 0.02 }).visible = outlinesOn;
       chalk.rotation.z = Math.PI / 2;
       chalk.rotation.y = (i - 1.5) * 0.15;
       chalk.position.set(3.3 + i * 0.6, 0.18, -3.88);
@@ -235,7 +252,7 @@ export class CRStage {
     const show = Math.min(count, 12);
     while (f.cards.length > show) f.group.remove(f.cards.pop());
     while (f.cards.length < show) {
-      const m = cardMesh({ w: CARD_W * 0.8, h: CARD_H * 0.8, t: CARD_T, face: backTex(), back: backTex(), side: 0xc99a62 });
+      const m = cardMesh({ w: CARD_W * 0.8, h: CARD_H * 0.8, t: CARD_T, face: backTex(), back: backTex() });
       f.group.add(m);
       f.cards.push(m);
     }
@@ -267,7 +284,7 @@ export class CRStage {
     const show = n <= 0 ? 0 : Math.min(18, Math.ceil(n / 6));
     while (this.drawStack.length > show) this.drawGroup.remove(this.drawStack.pop());
     while (this.drawStack.length < show) {
-      const m = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: backTex(), back: backTex(), side: 0xc99a62 });
+      const m = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: backTex(), back: backTex() });
       const i = this.drawStack.length;
       m.position.set((Math.random() - 0.5) * 0.03, 0.01 + i * 0.024, (Math.random() - 0.5) * 0.03);
       m.rotation.y = (Math.random() - 0.5) * 0.06;
@@ -284,7 +301,7 @@ export class CRStage {
   }
 
   addPileCard(code, mesh = null) {
-    const m = mesh || cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: cardTex(code), back: backTex(), side: 0xc99a62 });
+    const m = mesh || cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: cardTex(code), back: backTex() });
     if (!mesh) {
       m.position.copy(this.pileTopPos());
       m.rotation.y = (Math.random() - 0.5) * 0.7;
@@ -352,7 +369,7 @@ export class CRStage {
   // ---------- 연출 ----------
   /** 카드를 자리에서 버린 더미로 */
   async animatePlay(seat, code) {
-    const m = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: cardTex(code), back: backTex(), side: 0xc99a62 });
+    const m = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: cardTex(code), back: backTex() });
     const from = this.seatPos(seat);
     const mine = seat === this.me;
     m.position.copy(from).setY(mine ? from.y : 0.4);
@@ -365,13 +382,27 @@ export class CRStage {
     await this.s.moveTo(m, { pos: to, rotY: (Math.random() - 0.5) * 0.7, rotZ: 0, duration: 0.42, lift: 0.9 });
     this.s.group.remove(m);
     this.addPileCard(code, m);
+    this.boing(m);
+  }
+
+  /** 내려앉을 때 살짝 통통 */
+  boing(m, amount = 1) {
+    return tween({
+      duration: 0.32,
+      ease: ease.linear,
+      update: (k) => {
+        const w = Math.sin(k * Math.PI * 2) * Math.exp(-k * 3) * 0.12 * amount;
+        m.scale.set(1 + w, 1, 1 + w);
+      },
+      complete: () => m.scale.set(1, 1, 1),
+    });
   }
 
   /** 뽑을 더미에서 자리로 n장 */
   async animateDraw(seat, n) {
     const jobs = [];
     for (let i = 0; i < n; i++) {
-      const m = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: backTex(), back: backTex(), side: 0xc99a62 });
+      const m = cardMesh({ w: CARD_W, h: CARD_H, t: CARD_T, face: backTex(), back: backTex() });
       m.position.copy(this.drawTop());
       this.s.group.add(m);
       const to = this.seatPos(seat);

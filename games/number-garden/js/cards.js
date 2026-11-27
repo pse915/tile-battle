@@ -1,7 +1,7 @@
 // 숫자 블록 타일 그림 — 외부 이미지 없이 캔버스로 직접 그림 (독창적 디자인)
 // 타일 크기·모양·질감은 타일 배틀과 같은 방식: 상아색 둥근 블록(RoundedBox) + 앞면 CanvasTexture
 // 같은 캔버스 그림을 3D 텍스처와 DOM <img>(dataURL)에 같이 씀
-import { THREE, roundRect } from '../../../shared/table3d.js';
+import { THREE, roundRect, toonMat } from '../../../shared/table3d.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { COLORS, JOKER_KIND, kindNum, kindColor } from './rules.js';
 
@@ -16,36 +16,46 @@ const FONT = '"Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 
 // ---------- 꽃 무늬 (색맹 배려: 꽃마다 모양이 다름) ----------
 /** 동백: 둥근 꽃잎 5장 / 개나리: 길쭉한 꽃잎 4장(십자) / 수국: 작은 꽃 4송이 마름모 / 제비꽃: 위로 뾰족한 꽃잎 3장(삼각) */
-export function drawFlower(ctx, c, cx, cy, size) {
+function flowerPass(ctx, c, cx, cy, size, outline) {
+  const fill = () => {
+    if (outline) ctx.stroke();
+    ctx.fill();
+  };
+  const paint = (v) => (ctx.fillStyle = outline || v);
   const col = COLORS[c].color;
   const r = size / 2;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.fillStyle = col;
+  paint(col);
+  if (outline) {
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = size * 0.1;
+    ctx.lineJoin = 'round';
+  }
   if (c === 0) {
     for (let i = 0; i < 5; i++) {
       const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
       ctx.beginPath();
       ctx.arc(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5, r * 0.42, 0, Math.PI * 2);
-      ctx.fill();
+      fill();
     }
-    ctx.fillStyle = '#ffd34d';
+    paint('#ffd34d');
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.26, 0, Math.PI * 2);
-    ctx.fill();
+    fill();
   } else if (c === 1) {
     for (let i = 0; i < 4; i++) {
       ctx.save();
       ctx.rotate((i * Math.PI) / 2);
       ctx.beginPath();
       ctx.ellipse(0, -r * 0.5, r * 0.24, r * 0.5, 0, 0, Math.PI * 2);
-      ctx.fill();
+      fill();
       ctx.restore();
     }
-    ctx.fillStyle = '#fff6d0';
+    paint('#fff6d0');
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.16, 0, Math.PI * 2);
-    ctx.fill();
+    fill();
   } else if (c === 2) {
     const pts = [
       [0, -0.55],
@@ -60,15 +70,15 @@ export function drawFlower(ctx, c, cx, cy, size) {
         ctx.rotate(Math.PI / 2);
         ctx.beginPath();
         ctx.ellipse(0, -r * 0.17, r * 0.13, r * 0.19, 0, 0, Math.PI * 2);
-        ctx.fill();
+        fill();
       }
       ctx.restore();
     }
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    paint('rgba(255,255,255,.85)');
     for (const [x, y] of pts) {
       ctx.beginPath();
       ctx.arc(x * r, y * r, r * 0.07, 0, Math.PI * 2);
-      ctx.fill();
+      fill();
     }
   } else {
     for (let i = 0; i < 3; i++) {
@@ -78,15 +88,21 @@ export function drawFlower(ctx, c, cx, cy, size) {
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(r * 0.55, -r * 0.45, 0, -r * 0.98);
       ctx.quadraticCurveTo(-r * 0.55, -r * 0.45, 0, 0);
-      ctx.fill();
+      fill();
       ctx.restore();
     }
-    ctx.fillStyle = '#fff';
+    paint('#fff');
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.14, 0, Math.PI * 2);
-    ctx.fill();
+    fill();
   }
   ctx.restore();
+}
+
+/** outline 색을 주면 꽃 모양 그대로 두꺼운 테두리를 먼저 그림 (카툰) */
+export function drawFlower(ctx, c, cx, cy, size, outline = null) {
+  if (outline) flowerPass(ctx, c, cx, cy, size, outline);
+  flowerPass(ctx, c, cx, cy, size, null);
 }
 
 /** 새싹(조커): 흙더미에서 올라온 떡잎 두 장 */
@@ -132,45 +148,57 @@ export function drawSprout(ctx, cx, cy, size) {
 export function drawFace(ctx, kind, w = FACE_W, h = FACE_H) {
   ctx.save();
   ctx.scale(w / FACE_W, h / FACE_H);
-  const g = ctx.createLinearGradient(0, 0, 0, FACE_H);
-  g.addColorStop(0, '#fffef8');
-  g.addColorStop(1, '#f2ecdc');
-  ctx.fillStyle = g;
+  // 카툰: 단색 크림 바탕 + 두꺼운 남색 테두리
+  ctx.fillStyle = '#2e2a52';
   ctx.fillRect(0, 0, FACE_W, FACE_H);
+  ctx.fillStyle = '#fffaf0';
+  roundRect(ctx, 12, 12, FACE_W - 24, FACE_H - 24, 30);
+  ctx.fill();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
   if (kind >= JOKER_KIND) {
-    ctx.fillStyle = '#e9f7e2';
-    roundRect(ctx, 22, 22, FACE_W - 44, FACE_H - 44, 26);
+    ctx.fillStyle = '#dcf5cf';
+    roundRect(ctx, 26, 26, FACE_W - 52, FACE_H - 52, 24);
     ctx.fill();
-    ctx.strokeStyle = '#3f9a3a';
-    ctx.lineWidth = 6;
-    ctx.setLineDash([16, 10]);
-    roundRect(ctx, 22, 22, FACE_W - 44, FACE_H - 44, 26);
+    ctx.strokeStyle = '#2e7d32';
+    ctx.lineWidth = 7;
+    ctx.setLineDash([18, 10]);
+    roundRect(ctx, 26, 26, FACE_W - 52, FACE_H - 52, 24);
     ctx.stroke();
     ctx.setLineDash([]);
-    drawSprout(ctx, FACE_W / 2, 150, 190);
-    ctx.fillStyle = '#2f7a2b';
-    ctx.font = `56px ${FONT}`;
-    ctx.fillText('새싹', FACE_W / 2, 290);
+    drawSprout(ctx, FACE_W / 2, 150, 200);
+    ctx.font = `60px ${FONT}`;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 10;
+    ctx.strokeText('새싹', FACE_W / 2, 292);
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillText('새싹', FACE_W / 2, 292);
   } else {
     const c = kindColor(kind);
     const n = kindNum(kind);
     const col = COLORS[c];
-    // 아래쪽 꽃밭 띠 (꽃색 옅은 바탕)
+    // 아래쪽 꽃밭 띠 (꽃색 옅은 바탕 + 꽃색 테두리)
     ctx.fillStyle = col.light;
-    roundRect(ctx, 26, 210, FACE_W - 52, 124, 24);
+    roundRect(ctx, 28, 214, FACE_W - 56, 122, 26);
     ctx.fill();
     ctx.strokeStyle = col.color;
-    ctx.lineWidth = 5;
-    roundRect(ctx, 16, 16, FACE_W - 32, FACE_H - 32, 24);
+    ctx.lineWidth = 6;
     ctx.stroke();
+    // 큰 숫자: 흰 테두리로 또렷하게
+    ctx.font = `${n >= 10 ? 142 : 172}px ${FONT}`;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 12;
+    ctx.strokeText(String(n), FACE_W / 2, 116);
     ctx.fillStyle = col.color;
-    ctx.font = `${n >= 10 ? 130 : 156}px ${FONT}`;
-    ctx.fillText(String(n), FACE_W / 2, 118);
+    ctx.fillText(String(n), FACE_W / 2, 116);
     // 6과 9 헷갈리지 않게 밑줄
-    if (n === 6 || n === 9) ctx.fillRect(FACE_W / 2 - 30, 186, 60, 7);
-    drawFlower(ctx, c, FACE_W / 2, 272, 104);
+    if (n === 6 || n === 9) {
+      roundRect(ctx, FACE_W / 2 - 34, 186, 68, 10, 5);
+      ctx.fill();
+    }
+    // 꽃 기호: 남색 그림자 테두리 위에 꽃 (모양으로 구분 — 색맹 배려)
+    drawFlower(ctx, c, FACE_W / 2, 275, 108, '#2e2a52');
   }
   ctx.restore();
 }
@@ -179,14 +207,17 @@ export function drawFace(ctx, kind, w = FACE_W, h = FACE_H) {
 export function drawBack(ctx, w = FACE_W, h = FACE_H) {
   ctx.save();
   ctx.scale(w / FACE_W, h / FACE_H);
-  const g = ctx.createLinearGradient(0, 0, 0, FACE_H);
-  g.addColorStop(0, '#2f7a45');
-  g.addColorStop(1, '#215a33');
-  ctx.fillStyle = g;
+  ctx.fillStyle = '#2e2a52';
   ctx.fillRect(0, 0, FACE_W, FACE_H);
-  ctx.strokeStyle = 'rgba(255,248,220,.18)';
-  ctx.lineWidth = 6;
-  for (let x = -FACE_H; x < FACE_W + FACE_H; x += 40) {
+  ctx.fillStyle = '#58b86a';
+  roundRect(ctx, 12, 12, FACE_W - 24, FACE_H - 24, 30);
+  ctx.fill();
+  ctx.save();
+  roundRect(ctx, 12, 12, FACE_W - 24, FACE_H - 24, 30);
+  ctx.clip();
+  ctx.strokeStyle = '#6fcb7e';
+  ctx.lineWidth = 10;
+  for (let x = -FACE_H; x < FACE_W + FACE_H; x += 56) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x + FACE_H, FACE_H);
@@ -194,17 +225,18 @@ export function drawBack(ctx, w = FACE_W, h = FACE_H) {
     ctx.lineTo(x, FACE_H);
     ctx.stroke();
   }
-  ctx.fillStyle = '#fff7dc';
+  ctx.restore();
+  ctx.fillStyle = '#fffaf0';
   ctx.beginPath();
   ctx.arc(FACE_W / 2, FACE_H / 2, 66, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#e3b23c';
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#2e2a52';
+  ctx.lineWidth = 8;
   ctx.stroke();
   // 네 가지 꽃이 한 송이씩
   [0, 1, 2, 3].forEach((c, i) => {
     const a = -Math.PI / 2 + (i * Math.PI) / 2;
-    drawFlower(ctx, c, FACE_W / 2 + Math.cos(a) * 32, FACE_H / 2 + Math.sin(a) * 32, 40);
+    drawFlower(ctx, c, FACE_W / 2 + Math.cos(a) * 32, FACE_H / 2 + Math.sin(a) * 32, 40, '#2e2a52');
   });
   ctx.restore();
 }
@@ -245,14 +277,14 @@ function makeTexture(draw) {
 function shared() {
   if (geometry) return;
   geometry = new RoundedBoxGeometry(TILE_W, TILE_H, TILE_D, 3, 0.07);
-  bodyMat = new THREE.MeshStandardMaterial({ color: 0xf6f0de, roughness: 0.32 });
-  backMat = new THREE.MeshStandardMaterial({ map: makeTexture(drawBack), roughness: 0.4 });
+  bodyMat = toonMat(0xfff6df);
+  backMat = toonMat(0xffffff, { map: makeTexture(drawBack) });
 }
 
 /** 앞면 타일: 면 순서 +x, -x, +y, -y, +z(앞), -z(뒤) — 앞면이 +z */
 export function tileMesh(kind) {
   shared();
-  if (!faceMats.has(kind)) faceMats.set(kind, new THREE.MeshStandardMaterial({ map: makeTexture((ctx) => drawFace(ctx, kind)), roughness: 0.3 }));
+  if (!faceMats.has(kind)) faceMats.set(kind, toonMat(0xffffff, { map: makeTexture((ctx) => drawFace(ctx, kind)) }));
   const m = new THREE.Mesh(geometry, [bodyMat, bodyMat, bodyMat, bodyMat, faceMats.get(kind), backMat]);
   m.castShadow = true;
   m.receiveShadow = true;
