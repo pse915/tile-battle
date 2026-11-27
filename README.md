@@ -87,7 +87,7 @@ tests/                        서버 흐름 테스트 (node tests/<이름>.test.
 | 구글 앱스크립트 | 타일 배틀, 심해 보물섬, 흑백 뒤집기, 비밀번호 해독반, 숫자 블록 정원 (차례대로 하는 게임) | 짝수 |
 | Coolify 집 서버 (games-api.diple.dpdns.org, server/node-server.mjs) | 급식 다섯!, 컬러 러시, 서라벌학교여행 | 홀수 |
 
-- 어떤 게임이 어느 서버를 쓰는지는 [shared/config.js](shared/config.js)의 에서 바꿉니다.
+- 어떤 게임이 어느 서버를 쓰는지는 [shared/config.js](shared/config.js)의 `GAME_SERVER`에서 바꿉니다.
 - 허브에서 방 코드를 넣으면 끝자리로 서버를 찾아갑니다.
 - 서버 코드를 고치면 **둘 다** 갱신: 앱스크립트는 아래 '새 버전으로 재배포', Coolify는 GitHub에 푸시한 뒤 Coolify 화면에서 **Redeploy**.
 
