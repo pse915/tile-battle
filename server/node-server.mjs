@@ -71,8 +71,27 @@ setInterval(() => {
 
 // ---- 시트 대신 CSV 기록 (SpreadsheetApp 흉내) ----
 const csv = (v) => `"${String(v instanceof Date ? v.toISOString() : v).replace(/"/g, '""')}"`;
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') (cell += '"'), i++;
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') row.push(cell), (cell = '');
+    else if (c === '\n') row.push(cell), rows.push(row), (row = []), (cell = '');
+    else if (c !== '\r') cell += c;
+  }
+  return rows;
+}
+const readLog = () => (existsSync(LOG) ? parseCsv(readFileSync(LOG, 'utf8')) : []);
 const sheet = {
-  getLastRow: () => (existsSync(LOG) ? 1 : 0),
+  getLastRow: () => readLog().length,
+  // getRange(행, 열, 행 수, 열 수).getValues() — 1부터 셈
+  getRange: (r, c, n, m) => ({ getValues: () => readLog().slice(r - 1, r - 1 + n).map((x) => x.slice(c - 1, c - 1 + m)) }),
   appendRow: (row) => appendFileSync(LOG, row.map(csv).join(',') + '\n'),
 };
 const SpreadsheetApp = {
@@ -86,6 +105,7 @@ const ctx = vm.createContext({
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (text) => ({ text, setMimeType() { return this; } }) },
   Utilities: { getUuid: () => randomUUID() },
   SpreadsheetApp,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || '',
   ROOM_CODE_ODD: true, // 집 서버 방 코드는 끝자리 홀수 (앱스크립트는 짝수)
   Math,
   Date,

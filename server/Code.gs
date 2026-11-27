@@ -129,16 +129,41 @@ function logRoom(room, event, detail) {
     if (!ss) return;
     const sh = ss.getSheetByName('방 기록') || ss.insertSheet('방 기록');
     if (sh.getLastRow() === 0) sh.appendRow(['시간', '방 코드', '게임', '일', '참가자', '내용']);
-    sh.appendRow([new Date(), "'" + room.code, gameOf(room).title, event, room.players.map((p) => p.name).join(', '), detail || '']);
+    sh.appendRow([new Date(), "'" + room.code, gameOf(room).title, event, room.players.map((p) => (p.bot ? '🤖' : '') + p.name).join(', '), detail || '']);
   } catch (err) {
     /* 기록 실패는 게임에 영향 없음 */
   }
+}
+
+/** 관리자: 방 기록 읽기. 비밀번호는 서버 설정(ADMIN_PASSWORD)에만 둠 */
+function adminPassword() {
+  if (typeof ADMIN_PASSWORD !== 'undefined' && ADMIN_PASSWORD) return String(ADMIN_PASSWORD);
+  try {
+    if (typeof PropertiesService !== 'undefined') return PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD') || '';
+  } catch (err) {}
+  return '';
+}
+function adminLog(req) {
+  const pw = adminPassword();
+  if (!pw) fail('서버에 관리자 비밀번호가 설정되지 않았어요.');
+  if (String(req.password || '') !== pw) fail('비밀번호가 틀렸어요.');
+  if (typeof SpreadsheetApp === 'undefined') return { ok: true, rows: [] };
+  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss && ss.getSheetByName('방 기록');
+  const last = sh ? sh.getLastRow() : 0;
+  if (last < 2) return { ok: true, rows: [] };
+  const limit = Math.min(Number(req.limit) || 3000, 10000);
+  const first = Math.max(2, last - limit + 1);
+  const values = sh.getRange(first, 1, last - first + 1, 6).getValues();
+  const rows = values.map((r) => [r[0] instanceof Date ? r[0].toISOString() : String(r[0]), String(r[1]).replace(/^'/, ''), String(r[2]), String(r[3]), String(r[4]), String(r[5])]);
+  return { ok: true, rows: rows };
 }
 
 // ---------- 요청 처리 ----------
 function handleRequest(req) {
   const action = req.action;
   if (action === 'create') return withLock(() => createRoom(req));
+  if (action === 'adminLog') return adminLog(req);
   const code = String(req.code || '').trim();
   if (!/^[0-9]{4}$/.test(code)) fail('방 코드는 숫자 4자리예요.');
   if (action === 'lookup') return lookupRoom(code);
