@@ -28,7 +28,7 @@ export class CodeGame {
     this.queue = [];
     this.busy = false;
     this.target = null;
-    this.hint = false;
+    this.hint = true; // 불가능한 숫자 흐리게 (기본 켜짐)
     this.sending = false;
     this.labels = [];
     this.ot = null;
@@ -51,15 +51,17 @@ export class CodeGame {
     }
     $('#hud-body').innerHTML = `
       <div class="k-log cb-log" id="cb-log"><button type="button" id="cb-log-btn">📜 추리 기록</button><ol id="cb-log-list"></ol></div>
+      <section class="cb-board" id="cb-board" aria-label="친구들의 비밀번호"></section>
       <div class="k-bottom cb-bottom" id="cb-bottom">
+        <div class="cb-steps" id="cb-steps" aria-hidden="true"></div>
         <div class="cb-flag" id="cb-flag"></div>
-        <div class="cb-targets" id="cb-targets" hidden></div>
         <div class="cb-pad" id="cb-pad" hidden></div>
         <div class="k-hand cb-hand" id="cb-hand"></div>
         <div class="k-actions" id="cb-actions"></div>
       </div>`;
     $('#cb-log-btn').addEventListener('click', () => $('#cb-log').classList.toggle('open'));
     $('#cb-bottom').addEventListener('click', (e) => this.onClick(e));
+    $('#cb-board').addEventListener('click', (e) => this.onClick(e));
   }
 
   exit() {
@@ -176,6 +178,7 @@ export class CodeGame {
     this.labels = players.map((p, i) => {
       const el = document.createElement('div');
       el.className = 'seat-label cb-label';
+      if (i === me) el.hidden = true; // 내 정보는 아래 내 줄에 있으니 3D 이름표는 숨김
       el.innerHTML = `<span class="avatar">${p.emoji}</span><span><span class="name">${esc(p.name)}${i === me && p.name !== '나' ? ' (나)' : ''}</span><span class="meta"></span></span><span class="bubble"></span>`;
       root.appendChild(el);
       return el;
@@ -280,7 +283,8 @@ export class CodeGame {
     $('#cb-flag').classList.toggle('mine', mine || this.canPlace);
     const spectator = me < 0;
     $('#cb-bottom').classList.toggle('is-watch', spectator);
-    this.renderTargets(s, mine && phase === 'guess');
+    this.renderSteps(s, mine);
+    this.renderBoard(s, mine && phase === 'guess');
     this.renderPad(s, mine && phase === 'guess' && !!this.target);
     this.renderHand(s, spectator);
     this.renderActions(s, mine);
@@ -304,24 +308,40 @@ export class CodeGame {
     list.scrollTop = 1e6;
   }
 
-  renderTargets(s, on) {
-    const box = $('#cb-targets');
-    box.hidden = !on;
-    if (!on) return;
+  /** 지금 할 일 3단계 표시: ① 뽑기 → ② 고르기 → ③ 맞히기 */
+  renderSteps(s, mine) {
+    const el = $('#cb-steps');
+    const ph = s.cb.phase;
+    const show = s.status === 'playing' && mine && ['draw', 'place', 'guess'].includes(ph);
+    el.hidden = !show;
+    if (!show) return;
+    const cur = ph === 'draw' || ph === 'place' ? 0 : this.target ? 2 : 1;
+    el.innerHTML = ['뽑기', '타일 고르기', '숫자 맞히기'].map((t, i) => `<span class="${i === cur ? 'on' : i < cur ? 'done' : ''}">${'①②③'[i]} ${t}</span>`).join('<i>›</i>');
+  }
+
+  /** 위쪽 추리판: 친구들의 줄을 항상 크게 (자리 번호, 공개된 숫자). 추리 때는 숨긴 타일을 눌러 고름 */
+  renderBoard(s, on) {
+    const box = $('#cb-board');
     const cb = s.cb;
-    box.innerHTML = s.players
+    const rows = s.players
       .map((p, seat) => {
-        if (seat === s.mySeat || cb.out[seat]) return '';
-        const tiles = cb.rows[seat]
-          .map((t) => {
-            if (t.up) return `<span class="cb-mt up"><img src="${tileImg(t.c, t.n)}" alt="${COLOR_NAME[t.c]} ${numName(t.n)}"></span>`;
+        if (seat === s.mySeat) return '';
+        const out = !!cb.out[seat];
+        const tiles = (cb.rows[seat] || [])
+          .map((t, i) => {
+            const num = `<em>${i + 1}</em>`;
+            if (t.up) return `<span class="cb-bt up ${t.c}"><img src="${tileImg(t.c, t.n)}" alt="${i + 1}번째 ${COLOR_NAME[t.c]} ${numName(t.n)}">${num}</span>`;
             const sel = this.target && this.target.id === t.id;
-            return `<button type="button" class="cb-mt${sel ? ' sel' : ''}" data-target="${seat}:${t.id}" aria-label="${esc(p.name)}의 ${COLOR_NAME[t.c]} 숨긴 타일"><img src="${backImg(t.c)}" alt=""></button>`;
+            const can = on && !out;
+            return `<button type="button" class="cb-bt ${t.c}${sel ? ' sel' : ''}${can ? ' can' : ''}" ${can ? `data-target="${seat}:${t.id}"` : 'tabindex="-1"'} aria-label="${esc(p.name)}의 ${i + 1}번째 ${COLOR_NAME[t.c]} 숨긴 타일"><img src="${backImg(t.c)}" alt=""><b>?</b>${num}</button>`;
           })
           .join('');
-        return `<div class="cb-trow"><span class="who">${p.emoji} ${esc(p.name)}</span><div class="cb-mini">${tiles}</div></div>`;
+        const turn = s.status === 'playing' && cb.turn === seat;
+        return `<div class="cb-brow${out ? ' out' : ''}${turn ? ' turn' : ''}"><span class="who">${p.emoji} ${esc(p.name)}${out ? ' · 탈락' : ''}</span><div class="cb-btiles">${tiles}</div></div>`;
       })
       .join('');
+    box.innerHTML = rows;
+    box.classList.toggle('picking', on);
   }
 
   renderPad(s, on) {
@@ -342,12 +362,11 @@ export class CodeGame {
     }
     pad.innerHTML = `
       <div class="cb-pad-head">
-        <img src="${backImg(tile.c)}" alt=""><span><b>${esc(this.name(this.target.seat))}</b>의 ${this.posOf(this.target) + 1}번째 · ${COLOR_NAME[tile.c]}</span>
-        <button type="button" class="btn small${this.hint ? ' is-on' : ''}" data-hint>💡 후보</button>
-        <button type="button" class="btn small" data-cancel>취소</button>
+        <img src="${backImg(tile.c)}" alt=""><span><b>${esc(this.name(this.target.seat))}</b>의 <b>${this.posOf(this.target) + 1}번째</b> ${COLOR_NAME[tile.c]} 타일</span>
+        <label class="cb-hint"><input type="checkbox" data-hint ${this.hint ? 'checked' : ''}> 💡 안 되는 숫자 흐리게</label>
+        <button type="button" class="icon-btn small" data-cancel aria-label="다른 타일 고르기">✕</button>
       </div>
-      <div class="cb-nums">${nums.join('')}</div>
-      ${cand ? `<p class="cb-cand">정렬 규칙과 보이는 타일로 따져 본 후보: <b>${cand.map(numName).join(', ')}</b></p>` : ''}`;
+      <div class="cb-nums">${nums.join('')}</div>`;
   }
 
   renderHand(s, spectator) {
@@ -371,7 +390,7 @@ export class CodeGame {
       if (t.id === cb.fresh) cls.push('ok');
       if (penalty && !t.up) cls.push('pickable');
       parts.push(
-        `<button type="button" class="${cls.join(' ')}" ${penalty && !t.up ? `data-penalty="${t.id}"` : 'tabindex="-1"'} aria-label="${COLOR_NAME[t.c]} ${numName(t.n)}${t.up ? ' (공개됨)' : ''}"><img src="${tileImg(t.c, t.n)}" alt="">${t.up ? '<span class="cb-badge">공개</span>' : ''}</button>`,
+        `<button type="button" class="${cls.join(' ')}" ${penalty && !t.up ? `data-penalty="${t.id}"` : 'tabindex="-1"'} aria-label="${COLOR_NAME[t.c]} ${numName(t.n)}${t.up ? ' (공개됨)' : ''}"><img src="${tileImg(t.c, t.n)}" alt="">${t.up ? '<span class="cb-badge">공개</span>' : ''}<em class="cb-pos">${i + 1}</em></button>`,
       );
       if (placing) parts.push(`<button type="button" class="cb-slot" data-slot="${i + 1}" aria-label="${i + 1}번째 뒤에 놓기">＋</button>`);
     });
