@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <title>게임 기록 관리</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#f3efe4; --ink:#1f2a24; --soft:#5d6b62; --line:#d6cfbd; --card:#fffdf7; --green:#1d4d3b; --win:#c8891c; --bad:#b3402e; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 'IBM Plex Sans KR', system-ui, sans-serif; }
+    main { max-width:1100px; margin:0 auto; padding:24px 16px 60px; }
+    h1 { font:28px 'Jua', sans-serif; margin:0 0 4px; color:var(--green); }
+    h2 { font:20px 'Jua', sans-serif; margin:28px 0 10px; }
+    .sub { color:var(--soft); margin:0 0 20px; }
+    form.login { display:flex; gap:8px; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; max-width:460px; }
+    input, select, button { font:inherit; padding:9px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+    input[type=password] { flex:1; min-width:180px; }
+    button { background:var(--green); color:#fff; border-color:var(--green); cursor:pointer; font-weight:600; }
+    button.ghost { background:transparent; color:var(--green); }
+    :focus-visible { outline:3px solid var(--win); outline-offset:2px; }
+    .msg { color:var(--bad); margin:8px 0; min-height:1.5em; }
+    .src { color:var(--soft); font-size:13px; }
+    .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:16px 0; }
+    .bar input[type=search] { flex:1; min-width:160px; }
+    .stats { display:flex; gap:24px; flex-wrap:wrap; margin:8px 0 4px; }
+    .stats b { font:30px 'Jua', sans-serif; color:var(--green); display:block; line-height:1.1; }
+    .wrap { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:14px; }
+    table { border-collapse:collapse; width:100%; min-width:640px; }
+    th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { font-size:13px; color:var(--soft); font-weight:600; background:#f8f4ea; position:sticky; top:0; cursor:pointer; user-select:none; }
+    tr:last-child td { border-bottom:0; }
+    td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .who span { display:inline-block; margin:0 6px 2px 0; padding:1px 8px; border-radius:99px; background:#ece6d6; font-size:13px; }
+    .who span.w { background:var(--win); color:#fff; }
+    .who span.bot { opacity:.6; }
+    .name-link { color:var(--green); text-decoration:underline; cursor:pointer; background:none; border:0; padding:0; font:inherit; }
+    .empty { padding:20px; color:var(--soft); }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>게임 기록 관리</h1>
+  <p class="sub">온라인 방에서 끝난 판의 참가자와 결과를 봐요. 봇 연습·한 기기 모드는 기록되지 않아요.</p>
+
+  <form class="login" id="login">
+    <input type="password" id="pw" placeholder="관리자 비밀번호" autocomplete="current-password" required aria-label="관리자 비밀번호" />
+    <button type="submit">기록 보기</button>
+  </form>
+  <p class="msg" id="msg" role="status"></p>
+
+  <section id="view" hidden>
+    <div class="bar">
+      <input type="search" id="q" placeholder="닉네임·방 코드·결과 검색" aria-label="검색" />
+      <select id="game" aria-label="게임"><option value="">모든 게임</option></select>
+      <label><input type="checkbox" id="unfinished" /> 끝나지 않은 방도 보기</label>
+      <button type="button" class="ghost" id="reload">새로고침</button>
+      <button type="button" class="ghost" id="csv">CSV 저장</button>
+    </div>
+    <p class="src" id="src"></p>
+    <div class="stats" id="stats"></div>
+
+    <h2>닉네임별 기록</h2>
+    <div class="wrap"><table id="players"><thead><tr>
+      <th data-k="name">닉네임</th><th data-k="games">판 수</th><th data-k="wins">승리</th><th data-k="rate">승률</th><th data-k="fav">많이 한 게임</th><th data-k="last">마지막 판</th>
+    </tr></thead><tbody></tbody></table></div>
+
+    <h2>대전 기록</h2>
+    <div class="wrap"><table id="matches"><thead><tr>
+      <th>시간</th><th>게임</th><th>방</th><th>참가자</th><th>결과</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+<script type="module">
+  import { SERVERS } from '../shared/config.js';
+  const $ = (id) => document.getElementById(id);
+  let rows = [];
+  let sortKey = 'games', sortDir = -1;
+
+  async function fetchLog(name, url, password) {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'adminLog', password, limit: 5000 }) });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error);
+    return out.rows.map(([time, code, game, event, players, detail]) => ({ time: new Date(time), code, game, event, players, detail, server: name }));
+  }
+
+  async function load() {
+    const password = $('pw').value;
+    $('msg').textContent = '불러오는 중…';
+    const results = await Promise.allSettled(Object.entries(SERVERS).map(([n, u]) => fetchLog(n, u, password)));
+    const label = { coolify: '집 서버(Coolify)', gas: '앱스크립트' };
+    const notes = [];
+    rows = [];
+    results.forEach((r, i) => {
+      const n = Object.keys(SERVERS)[i];
+      if (r.status === 'fulfilled') { rows.push(...r.value); notes.push(label[n] + ' ' + r.value.length + '줄'); }
+      else notes.push(label[n] + ': ' + r.reason.message);
+    });
+    if (results.every((r) => r.status === 'rejected')) { $('msg').textContent = results[0].reason.message; return; }
+    try { sessionStorage.setItem('adminPw', password); } catch {}
+    $('msg').textContent = '';
+    $('src').textContent = notes.join(' · ');
+    $('login').hidden = true;
+    $('view').hidden = false;
+    const games = [...new Set(rows.map((r) => r.game))].sort();
+    $('game').innerHTML = '<option value="">모든 게임</option>' + games.map((g) => `<option>${esc(g)}</option>`).join('');
+    render();
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const fmt = (d) => d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const people = (s) => String(s || '').split(', ').filter(Boolean).map((n) => ({ bot: n.startsWith('🤖'), name: n.replace(/^🤖/, '') }));
+  function winnerOf(detail) {
+    let m = /(?:승리|승자): ([^\s(/]+)/.exec(detail);
+    if (m) return m[1];
+    m = /순위: ([^\s>]+)/.exec(detail);
+    return m ? m[1] : null;
+  }
+
+  // 같은 방은 시작 → 끝 순서로 기록됨. '게임 끝' 줄을 한 판으로 봄
+  function matches() {
+    const showAll = $('unfinished').checked;
+    const list = rows.filter((r) => r.event === '게임 끝' || (showAll && r.event === '게임 시작'));
+    return list.map((r) => ({ ...r, who: people(r.players), winner: r.event === '게임 끝' ? winnerOf(r.detail) : null }));
+  }
+
+  function render() {
+    const q = $('q').value.trim().toLowerCase();
+    const g = $('game').value;
+    const list = matches()
+      .filter((m) => !g || m.game === g)
+      .filter((m) => !q || [m.players, m.code, m.detail].join(' ').toLowerCase().includes(q))
+      .sort((a, b) => b.time - a.time);
+
+    const finished = list.filter((m) => m.event === '게임 끝');
+    const humans = new Set(finished.flatMap((m) => m.who.filter((p) => !p.bot).map((p) => p.name)));
+    const today = finished.filter((m) => m.time.toDateString() === new Date().toDateString()).length;
+    $('stats').innerHTML = [['끝난 판', finished.length], ['오늘', today], ['닉네임', humans.size]].map(([k, v]) => `<div><b>${v}</b>${k}</div>`).join('');
+
+    const map = new Map();
+    for (const m of finished) for (const p of m.who) {
+      if (p.bot) continue;
+      const s = map.get(p.name) || { name: p.name, games: 0, wins: 0, last: m.time, by: {} };
+      s.games++; if (m.winner === p.name) s.wins++;
+      if (m.time > s.last) s.last = m.time;
+      s.by[m.game] = (s.by[m.game] || 0) + 1;
+      map.set(p.name, s);
+    }
+    const ps = [...map.values()].map((s) => ({ ...s, rate: s.games ? s.wins / s.games : 0, fav: Object.entries(s.by).sort((a, b) => b[1] - a[1])[0][0] }));
+    ps.sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
+    $('players').tBodies[0].innerHTML = ps.length ? ps.map((s) => `<tr>
+      <td><button class="name-link" data-name="${esc(s.name)}">${esc(s.name)}</button></td>
+      <td class="num">${s.games}</td><td class="num">${s.wins}</td><td class="num">${Math.round(s.rate * 100)}%</td>
+      <td>${esc(s.fav)}</td><td>${fmt(s.last)}</td></tr>`).join('') : '<tr><td colspan="6" class="empty">아직 끝난 온라인 판이 없어요.</td></tr>';
+
+    $('matches').tBodies[0].innerHTML = list.length ? list.slice(0, 1000).map((m) => `<tr>
+      <td>${fmt(m.time)}</td><td>${esc(m.game)}</td><td>${esc(m.code)}</td>
+      <td class="who">${m.who.map((p) => `<span class="${p.name === m.winner ? 'w' : ''} ${p.bot ? 'bot' : ''}">${p.bot ? '🤖 ' : ''}${esc(p.name)}</span>`).join('')}</td>
+      <td>${m.event === '게임 끝' ? esc(m.detail) : '<i>진행 중이거나 중간에 나감</i>'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">조건에 맞는 기록이 없어요.</td></tr>';
+  }
+
+  $('login').addEventListener('submit', (e) => { e.preventDefault(); load().catch((err) => ($('msg').textContent = '서버에 연결하지 못했어요: ' + err.message)); });
+  $('reload').addEventListener('click', () => load());
+  ['q', 'game', 'unfinished'].forEach((id) => $(id).addEventListener('input', render));
+  $('players').tHead.addEventListener('click', (e) => {
+    const k = e.target.dataset.k; if (!k) return;
+    sortDir = sortKey === k ? -sortDir : -1; sortKey = k; render();
+  });
+  $('players').tBodies[0].addEventListener('click', (e) => {
+    const n = e.target.dataset.name; if (!n) return;
+    $('q').value = n; render(); $('matches').scrollIntoView({ behavior: 'smooth' });
+  });
+  $('csv').addEventListener('click', () => {
+    const lines = [['시간', '서버', '방 코드', '게임', '일', '참가자', '내용'], ...rows.map((r) => [r.time.toISOString(), r.server, r.code, r.game, r.event, r.players, r.detail])];
+    const blob = new Blob(['﻿' + lines.map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: '게임기록.csv' });
+    a.click();
+  });
+  try { const saved = sessionStorage.getItem('adminPw'); if (saved) { $('pw').value = saved; load(); } } catch {}
+</script>
+</body>
+</html>
