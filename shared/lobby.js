@@ -1,6 +1,7 @@
 // 공용 온라인 대기방: 방 만들기 / 코드로 참여 / 대기방 화면 / 폴링
 // 게임 화면은 onGameState(state, isFirst)로 서버 상태를 받아 그리기만 하면 됨
 import { api, onlineReady } from './net.js';
+import { Chat } from './chat.js';
 import { $, esc, showScreen, toast } from './ui-core.js';
 import { common } from './storage.js';
 import './offline-table.js'; // 방 모드 고르기·오프라인 화면 스타일
@@ -102,6 +103,11 @@ export class Lobby {
     this.spectator = false; // true: 📺 테이블 화면 (참가하지 않고 보기만)
     document.body.insertAdjacentHTML('beforeend', TEMPLATE(o.title));
     this.bind();
+    this.chat = new Chat({
+      audio: o.audio,
+      send: (text) => this.send('chat', { text }),
+      mute: (target, mute) => this.send('chatMute', { target, mute }),
+    });
   }
 
   call(action, payload = {}) {
@@ -263,6 +269,7 @@ export class Lobby {
     if (!this.spectator) this.call('leave', { code: this.code, pid: this.pid }).catch(() => {});
     if (!this.local) rememberPid(this.code, null);
     this.seatPids = null;
+    this.chat.hide();
     if (this.inGame) {
       this.inGame = false;
       this.onLeaveGame();
@@ -332,6 +339,7 @@ export class Lobby {
     if (!this.active || s.same || s.version <= this.version) return;
     this.version = s.version;
     this.state = s;
+    this.chat.update(s, { pid: this.pid, spectator: this.spectator, local: this.local });
     if (s.status === 'lobby' && this.spectator) {
       this.onGameState(s, !this.inGame);
       this.inGame = true;

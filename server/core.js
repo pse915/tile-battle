@@ -153,6 +153,48 @@ function adminLog(req) {
   return { ok: true, rows: rows };
 }
 
+// ---------- 채팅 ----------
+// 메시지는 room.chat에 따로 보관 (게임 이벤트 80개에 밀려 사라지지 않게). poll 응답에 같이 실려 감
+const CHAT_MAX = 50;
+const CHAT_LEN = 60;
+const CHAT_GAP_MS = 2000;
+// 욕설·비속어 (글자 사이에 띄어쓰기·숫자·기호를 끼워도 걸림)
+const CHAT_BAD = ['씨발', '시발', '씨바', '시바', '씹', 'ㅅㅂ', 'ㅆㅂ', 'ㅅㅂㄹㅁ', '병신', '븅신', '빙신', 'ㅂㅅ', '개새끼', '개새', '쌔끼', 'ㅅㄲ', '좆', 'ㅈ같', '존나', '졸라', 'ㅈㄴ', '지랄', 'ㅈㄹ', '미친놈', '미친년', '미친새', '닥쳐', '꺼져', '엠창', '느금', '니애미', '니엄마', '썅', '염병', '등신', '찐따', '장애인', 'fuck', 'shit', 'bitch', 'asshole'];
+const CHAT_SEP = '[\\s\\d.,_\\-~!*^ㆍ·]*';
+const CHAT_BAD_RE = new RegExp(CHAT_BAD.map((w) => w.split('').join(CHAT_SEP)).join('|'), 'gi');
+const CHAT_PHONE_RE = /(01[016789]|0\d{1,2})[\s.\-]*\d{3,4}[\s.\-]*\d{4}/;
+const CHAT_LINK_RE = /(https?:|www\.|[a-z0-9-]+\.(com|net|org|kr|io|gg|me|ly|xyz|co)\b|@[a-z0-9_]{3,}|카톡\s*아이디|오픈\s*채팅|인스타)/i;
+
+function cleanChat(text) {
+  let t = String(text || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+  if (!t) fail('보낼 말을 적어 주세요.');
+  if (t.length > CHAT_LEN) fail('채팅은 ' + CHAT_LEN + '자까지 보낼 수 있어요.');
+  if (CHAT_PHONE_RE.test(t)) fail('전화번호는 채팅으로 보낼 수 없어요.');
+  if (CHAT_LINK_RE.test(t)) fail('링크나 연락처 아이디는 채팅으로 보낼 수 없어요.');
+  return t.replace(CHAT_BAD_RE, (m) => m.replace(/\S/g, '＊'));
+}
+function postChat(room, me, text) {
+  if ((room.chatMuted || []).indexOf(me.id) >= 0) fail('방장이 채팅을 꺼 두었어요.');
+  const now = Date.now();
+  room.chatAt = room.chatAt || {};
+  if (now - (room.chatAt[me.id] || 0) < CHAT_GAP_MS) fail('천천히! 2초에 한 번씩 보낼 수 있어요.');
+  const t = cleanChat(text);
+  room.chatAt[me.id] = now;
+  room.chatSeq = (room.chatSeq || 0) + 1;
+  room.chat = room.chat || [];
+  room.chat.push({ type: 'chat', id: room.chatSeq, pid: me.id, name: me.name, text: t, t: now });
+  while (room.chat.length > CHAT_MAX) room.chat.shift();
+  logRoom(room, '채팅', me.name + ': ' + t);
+}
+function muteChat(room, target, mute) {
+  const p = room.players.find((x) => x.id === target);
+  if (!p || p.bot) fail('그런 참가자가 없어요.');
+  if (p.id === room.hostId) fail('방장은 음소거할 수 없어요.');
+  const list = (room.chatMuted || []).filter((id) => id !== p.id);
+  if (mute) list.push(p.id);
+  room.chatMuted = list;
+}
+
 // ---------- 요청 처리 ----------
 function handleRequest(req) {
   const action = req.action;
@@ -199,6 +241,13 @@ function handleRequest(req) {
         g.start(room);
         room.lastActionAt = Date.now();
         logRoom(room, '게임 시작');
+        break;
+      case 'chat':
+        postChat(room, me, req.text);
+        break;
+      case 'chatMute':
+        hostOnly();
+        muteChat(room, req.target, !!req.mute);
         break;
       case 'lobby':
         hostOnly();
@@ -400,6 +449,8 @@ function roomView(room, pid) {
       ),
     ),
     events: g.filterEvents ? g.filterEvents(room, mySeat) : room.events,
+    chat: room.chat || [],
+    chatMuted: room.chatMuted || [],
     seq: room.seq,
   };
   return Object.assign(base, g.view(room, mySeat));

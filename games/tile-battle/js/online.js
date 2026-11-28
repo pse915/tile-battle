@@ -4,6 +4,7 @@ import { hintMove } from './ai.js';
 import { wait } from '../../../shared/anim.js';
 import { audio } from './audio.js';
 import { api } from '../../../shared/net.js';
+import { Chat } from '../../../shared/chat.js';
 import * as ui from './ui.js';
 import { tileImage, tileBackImage } from './tiles.js';
 import { tileLabel } from './rules.js';
@@ -50,6 +51,11 @@ export class Online {
     this.active = false;
     this.sortMode = 'num';
     this.queue = [];
+    this.chat = new Chat({
+      audio,
+      send: (text) => this.sendOk('chat', { text }),
+      mute: (target, mute) => this.sendOk('chatMute', { target, mute }),
+    });
   }
 
   // ---------- 방 만들기 / 참여 / 나가기 ----------
@@ -94,6 +100,7 @@ export class Online {
   leave() {
     if (!this.active) return;
     this.active = false;
+    this.chat.hide();
     clearTimeout(this.timer);
     if (!this.spectator) api('leave', { code: this.code, pid: this.pid }).catch(() => {});
     try {
@@ -128,6 +135,7 @@ export class Online {
       if (err.data?.gone) {
         ui.toast(err.message, 2600);
         this.active = false;
+        this.chat.hide();
         this.onExit();
         return;
       }
@@ -171,9 +179,11 @@ export class Online {
     if (!this.active || s.same || s.version <= this.version) return;
     this.version = s.version;
     this.state = s;
+    this.chat.update(s, { pid: this.pid, spectator: this.spectator });
     if (this.spectator && s.mode !== 'offline') {
       ui.toast('📺 테이블 화면은 오프라인 테이블 모드 방에서만 쓸 수 있어요.', 3000);
       this.active = false;
+      this.chat.hide();
       return this.onExit();
     }
     if (s.mode === 'offline' && (s.status !== 'lobby' || this.spectator)) {
