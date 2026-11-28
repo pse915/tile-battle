@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#2a2140" />
+  <meta name="description" content="보석을 모아 공방 카드를 사고, 할인을 쌓아 15점을 먼저 모으는 2~4인 카드 게임. 봇 연습, 한 기기 여러 명, 온라인 방" />
+  <title>보석 공방</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../shared/ui-core.css" />
+  <link rel="stylesheet" href="../../shared/kit.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <noscript>이 게임은 자바스크립트가 필요해요.</noscript>
+  <script type="module" src="./js/main.js"></script>
+  <script>
+    setTimeout(function () {
+      var l = document.getElementById('loading');
+      if (l && l.classList.contains('is-active')) l.innerHTML = '<p class="loading-text">불러오기가 오래 걸려요. 인터넷 연결을 확인하고 새로고침해 주세요.</p>';
+    }, 15000);
+  </script>
+</body>
+</html>
