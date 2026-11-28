@@ -80,6 +80,15 @@ body.hub {
 .rush .k1 { left: calc(50% - 110px); background: #ef5d7a; transform: rotate(-12deg); }
 .rush .k2 { left: calc(50% - 30px); background: #3fb5a3; top: 16px; }
 .rush .k3 { left: calc(50% + 50px); background: #f2b13b; transform: rotate(11deg); }
+.gem .art { background: radial-gradient(circle at 30% 20%, #6b5aa8, #2a2140); }
+.gem .g { position: absolute; font-size: 2.6rem; top: 30px; }
+.gem .g1 { left: calc(50% - 120px); } .gem .g2 { left: calc(50% + 78px); top: 20px; }
+.gem .c { position: absolute; top: 18px; width: 64px; height: 90px; border-radius: 10px; border: 4px solid #2b2140; box-shadow: 0 8px 0 rgba(0,0,0,.25); font-family: var(--display); }
+.gem .c b { position: absolute; left: 8px; top: 4px; font-size: 1.8rem; color: #2b2140; }
+.gem .c i { position: absolute; right: 8px; top: 10px; width: 18px; height: 18px; transform: rotate(45deg); border: 2px solid #2b2140; border-radius: 4px; }
+.gem .c i.r { background: #e0475b; } .gem .c i.b { background: #3a7bd5; }
+.gem .c1 { left: calc(50% - 68px); background: linear-gradient(#e3e5ff, #b8bdf5); transform: rotate(-8deg); }
+.gem .c2 { left: calc(50% + 2px); background: linear-gradient(#e6f4d8, #c9e6b0); transform: rotate(9deg); }
 .onecard .art { background: linear-gradient(135deg, #2f8f86, #1f5f5a); }
 .onecard .t { position: absolute; top: 24px; width: 60px; height: 88px; border-radius: 10px; display: grid; place-items: center; align-content: center; font-family: var(--display); font-size: 1.6rem; line-height: 1; color: #1f2a3a; background: #fffaf0; border: 4px solid #1f3550; box-shadow: 0 8px 0 rgba(0,0,0,.25); }
 .onecard .t b { font-size: 2rem; }

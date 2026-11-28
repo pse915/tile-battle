@@ -1,0 +1,154 @@
+/* 보석 공방 — 밤의 공방(남보라) + 금빛. 카드는 단계별 바탕색, 보석은 색 + 첫 글자 */
+:root { --gw-gold: #f2b631; --gw-night: #2a2140; }
+
+.gw-gem {
+  display: inline-grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font: 700 12px/1 var(--display, 'Jua'), sans-serif; color: #fff;
+  border: 2px solid rgba(0,0,0,.35); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18);
+  flex: none;
+}
+.gw-gem.g-r { background: #e0475b; }
+.gw-gem.g-b { background: #3a7bd5; }
+.gw-gem.g-g { background: #2fae6a; }
+.gw-gem.g-w { background: #f3eee2; color: #4a3f2b; }
+.gw-gem.g-k { background: #3b3346; }
+.gw-gem.g-y { background: var(--gw-gold); color: #5a3800; }
+.gw-gem.mini { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
+.gw-gem.zero { opacity: .35; }
+
+/* 위: 참가자 줄 */
+.gw-players {
+  position: absolute; left: 8px; right: 8px; top: calc(60px + var(--safe-t));
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px;
+}
+.gw-pl {
+  flex: 1 0 128px; max-width: 220px; text-align: left;
+  display: grid; grid-template-columns: 1fr auto; gap: 1px 6px;
+  padding: 5px 8px; border-radius: 12px; border: 2.5px solid transparent;
+  background: rgba(255,255,255,.94); color: var(--ink); font: inherit; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,.35);
+}
+.gw-pl.turn { border-color: var(--gw-gold); box-shadow: 0 0 0 3px rgba(242,182,49,.45), 0 3px 10px rgba(0,0,0,.35); }
+.gw-pl.me { background: #fff8e3; }
+.gw-pl .who { font-family: var(--display); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gw-pl .pts { font-family: var(--display); font-size: 1.25rem; line-height: 1; grid-row: span 2; align-self: center; color: #6b3fa0; }
+.gw-pl .pts small { font-size: .7rem; }
+.gw-pl .mini-row { display: flex; gap: 2px; align-items: center; font-size: .72rem; color: var(--ink-soft); min-height: 18px; }
+.gw-pl .mini-row.sub { grid-column: 1 / -1; }
+.gw-pl.flash { animation: gwflash .7s ease-out; }
+@keyframes gwflash { 30% { transform: scale(1.06); background: #fff1b8; } }
+
+/* 3D 보석 더미 위 남은 개수 */
+.gw-badges { position: absolute; inset: 0; pointer-events: none; }
+.gw-badge {
+  position: absolute; left: 0; top: 0; min-width: 24px; padding: 1px 6px; text-align: center;
+  background: rgba(255,255,255,.95); color: var(--ink); border-radius: 10px;
+  font: 1rem var(--display); box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+
+/* 가운데: 카드 시장 */
+.gw-market {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: calc(var(--safe-t) + 62px + 76px + 15vh);
+  bottom: calc(var(--safe-b) + 150px);
+  width: min(560px, calc(100% - 16px));
+  display: flex; flex-direction: column; gap: 6px; justify-content: flex-start;
+  overflow-y: auto; scrollbar-width: none; padding: 4px;
+}
+.gw-patrons { display: flex; gap: 5px; justify-content: safe center; overflow-x: auto; scrollbar-width: none; flex: none; }
+.gw-patron {
+  flex: none;
+  display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 10px;
+  background: #fff4d6; border: 2px solid #c8962b; box-shadow: 0 2px 6px rgba(0,0,0,.3); font-size: .8rem;
+}
+.gw-patron .pe { font-size: 1.15rem; }
+.gw-patron b { font-family: var(--display); color: #8a5a00; }
+.gw-patron .need { display: flex; gap: 2px; }
+.gw-patron .gw-gem { width: 18px; height: 18px; font-size: 10px; border-radius: 4px; }
+.gw-row { display: grid; grid-template-columns: .7fr repeat(4, 1fr); gap: 6px; }
+
+.gw-card, .gw-deck {
+  position: relative; aspect-ratio: 5 / 7; border-radius: 10px; padding: 4px;
+  border: 2.5px solid #2b2140; font: inherit; cursor: pointer; color: var(--ink);
+  display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 0 3px 8px rgba(0,0,0,.35); touch-action: manipulation; min-width: 0;
+  transition: transform .12s;
+}
+.gw-card:active, .gw-deck:active { transform: scale(.96); }
+.gw-card.t1 { background: linear-gradient(180deg, #e6f4d8, #c9e6b0); }
+.gw-card.t2 { background: linear-gradient(180deg, #fde9cf, #f5c992); }
+.gw-card.t3 { background: linear-gradient(180deg, #e3e5ff, #b8bdf5); }
+.gw-card.can { box-shadow: 0 0 0 3px #7ee08a, 0 3px 8px rgba(0,0,0,.35); }
+.gw-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.gw-card-top b { font: 1.5rem/1 var(--display); color: #2b2140; text-shadow: 0 1px 0 #fff; }
+.gw-card-top .bonus { width: 26px; height: 26px; font-size: 13px; border-radius: 7px; }
+.gw-card-cost { display: flex; flex-wrap: wrap-reverse; gap: 2px; }
+.gw-card-cost .gw-gem { width: 19px; height: 19px; font-size: 11px; }
+.gw-card.big { width: 140px; margin: 0 auto; cursor: default; }
+.gw-card.big .gw-card-cost .gw-gem { width: 28px; height: 28px; font-size: 15px; }
+.gw-card.small { width: 46px; padding: 2px; border-width: 2px; border-radius: 7px; flex: none; }
+.gw-card.small .gw-card-top b { font-size: .95rem; }
+.gw-card.small .bonus { width: 15px; height: 15px; font-size: 8px; border-radius: 4px; border-width: 1.5px; }
+.gw-card.small .gw-card-cost .gw-gem { width: 12px; height: 12px; font-size: 7px; border-width: 1px; }
+.gw-card.back { display: grid; place-items: center; font: .75rem var(--display); color: #fff; background: #5b4a8a; aspect-ratio: 5 / 7; }
+.gw-deck { color: #fff; background: repeating-linear-gradient(45deg, #5b4a8a 0 8px, #4d3e78 8px 16px); font-family: var(--display); font-size: .82rem; align-items: center; justify-content: center; gap: 2px; }
+.gw-deck b { font-size: 1.1rem; }
+.gw-deck.t1 { border-color: #7fb069; } .gw-deck.t2 { border-color: #e6aa68; } .gw-deck.t3 { border-color: #6d7ae0; }
+
+/* 아래: 내 공방 */
+.gw-me {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 6px 8px calc(8px + var(--safe-b));
+  display: flex; flex-direction: column; gap: 5px; align-items: center;
+  background: linear-gradient(180deg, rgba(20,14,34,0) 0%, rgba(20,14,34,.8) 30%);
+}
+.gw-me-row { display: flex; gap: 5px; align-items: center; max-width: 100%; overflow-x: auto; scrollbar-width: none; color: #fff; }
+.gw-me-row .lbl { font: .8rem var(--display); color: #e8ddff; white-space: nowrap; }
+.gw-me-row .hint { font-size: .78rem; color: #cfc3ea; }
+.gw-mygem { position: relative; border: 0; background: none; padding: 2px; cursor: default; }
+.gw-mygem .gw-gem { width: 30px; height: 30px; font-size: 15px; }
+.gw-mygem small { position: absolute; right: -4px; bottom: -2px; background: #fff; color: #2b2140; border-radius: 6px; padding: 0 3px; font: .68rem var(--display); }
+.gw-mygem.can-return { cursor: pointer; animation: kbob 1.2s ease-in-out infinite; }
+.gw-pickrow { display: flex; gap: 6px; }
+.gw-pickgem { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
+.gw-pickgem .gw-gem { width: 44px; height: 44px; font-size: 16px; }
+.gw-pickgem.on .gw-gem { outline: 3px solid var(--gw-gold); outline-offset: 2px; transform: translateY(-4px); }
+.gw-pickgem:disabled { opacity: .3; cursor: not-allowed; }
+.gw-flag { bottom: calc(var(--safe-b) + 156px); }
+
+.gw-cover { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(20,14,34,.92); z-index: 5; }
+.gw-cover-box { background: #fff; border-radius: 18px; padding: 22px; max-width: 360px; text-align: center; }
+.gw-cover-box .big { font-size: 3rem; margin: 0; }
+
+.gw-zoom { margin: 4px 0 10px; }
+.gw-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+.gw-result { list-style: none; padding: 0; margin: 0; }
+.gw-result li { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px dashed var(--omr-line); }
+.gw-result li.win { font-weight: 700; }
+.rules-body .gw-card { display: inline-flex; width: 54px; vertical-align: middle; cursor: default; }
+
+@media (max-width: 560px) {
+  .gw-pl { flex-basis: 108px; padding: 4px 6px; }
+  .gw-pl .who { font-size: .8rem; }
+  .gw-market { top: calc(var(--safe-t) + 250px); bottom: calc(var(--safe-b) + 176px); gap: 4px; }
+  .gw-card { aspect-ratio: 5 / 6; }
+  .gw-patron .gw-gem { width: 15px; height: 15px; font-size: 9px; }
+  .k-log { top: calc(var(--safe-t) + 136px); }
+  .gw-flag { bottom: calc(var(--safe-b) + 150px); font-size: .9rem; }
+  .gw-row { gap: 4px; }
+  .gw-card { padding: 3px; border-width: 2px; border-radius: 8px; }
+  .gw-card-top b { font-size: 1.15rem; }
+  .gw-card-top .bonus { width: 19px; height: 19px; font-size: 10px; }
+  .gw-card-cost .gw-gem { width: 15px; height: 15px; font-size: 9px; border-width: 1.5px; }
+  .gw-patron { padding: 2px 4px; font-size: .7rem; }
+  .gw-patron .pe { font-size: .95rem; }
+  .gw-pickgem .gw-gem { width: 40px; height: 40px; }
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  .gw-market { left: auto; right: 12px; transform: none; top: calc(var(--safe-t) + 146px); bottom: calc(var(--safe-b) + 120px); width: min(430px, 36vw); }
+  .gw-row { grid-template-columns: .6fr repeat(4, 1fr); }
+  .gw-card { aspect-ratio: 5 / 6.2; }
+  .k-log { right: auto; left: 10px; top: auto; bottom: calc(var(--safe-b) + 130px); max-height: 30vh; }
+  .gw-patrons { flex-wrap: wrap; }
+}
