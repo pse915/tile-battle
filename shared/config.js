@@ -12,6 +12,8 @@ export const GAME_SERVER = {
   'code-breaker': 'gas',
   // 나머지는 모두 집 서버(Coolify)
 };
+// 채팅은 Coolify 게임만 (앱스크립트는 메시지마다 시트에 쓰느라 느리고 부담이 큼)
+export const chatEnabled = (game) => (GAME_SERVER[game] || 'coolify') !== 'gas';
 export const serverFor = (game) => SERVERS[GAME_SERVER[game] || 'coolify'];
 export const serverForCode = (code) => SERVERS[Number(String(code).slice(-1)) % 2 ? 'coolify' : 'gas'];
 // 게임 이름 없이 오는 요청(예전 타일 배틀 클라이언트)의 기본 서버

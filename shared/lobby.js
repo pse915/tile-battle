@@ -2,6 +2,7 @@
 // 게임 화면은 onGameState(state, isFirst)로 서버 상태를 받아 그리기만 하면 됨
 import { api, onlineReady } from './net.js';
 import { Chat } from './chat.js';
+import { chatEnabled } from './config.js';
 import { $, esc, showScreen, toast } from './ui-core.js';
 import { common } from './storage.js';
 import './offline-table.js'; // 방 모드 고르기·오프라인 화면 스타일
@@ -105,6 +106,7 @@ export class Lobby {
     this.bind();
     this.chat = new Chat({
       audio: o.audio,
+      disabled: !chatEnabled(o.game),
       send: (text) => this.send('chat', { text }),
       mute: (target, mute) => this.send('chatMute', { target, mute }),
     });

@@ -19,7 +19,8 @@ function loadCss() {
 }
 
 export class Chat {
-  constructor({ send, mute, audio }) {
+  constructor({ send, mute, audio, disabled = false }) {
+    this.disabled = disabled;
     this.sendFn = send;
     this.muteFn = mute;
     this.audio = audio;
@@ -121,7 +122,7 @@ export class Chat {
   }
 
   update(s, { pid, spectator = false, local = false } = {}) {
-    if (local || !s || !Array.isArray(s.chat)) return this.hide();
+    if (this.disabled || local || !s || !Array.isArray(s.chat)) return this.hide();
     this.root.hidden = false;
     this.pid = pid;
     this.readonly = spectator;
